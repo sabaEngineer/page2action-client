@@ -64,7 +64,7 @@ export default function LandingPage() {
             </Link>
           ) : (
             <a
-              href="/auth/google"
+              href={`${import.meta.env.VITE_API_URL ?? ''}/auth/google`}
               className="inline-flex items-center gap-2 text-sm font-medium px-5 py-2.5 bg-white/10 text-white rounded-lg border border-white/10 hover:bg-white/15 transition-colors"
             >
               <GoogleIcon />
