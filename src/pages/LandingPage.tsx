@@ -81,12 +81,11 @@ export default function LandingPage() {
           </span>
         </h1>
 
-        <p className="mt-6 text-lg text-gray-400 text-center ">
+        <p className="mt-6 text-lg text-gray-400 text-center max-w-[650px]">
           Read 30 books or read none {'\u2014'} if you don{'\u2019'}t use it.
-          Take one idea and make it real today.
         </p>
-        <p className=" text-lg text-gray-400 text-center ">
-          We help you remember and use what you read {'\u2014'}{' '}
+        <p className="mt-2 text-lg text-gray-400 text-center max-w-[650px]">
+          Take one idea and make it real today. We help you remember and use what you read {'\u2014'}{' '}
           <span className="underline decoration-indigo-400/60 underline-offset-4">at the right time</span>,{' '}
           <span className="underline decoration-violet-400/60 underline-offset-4">in the right moment</span>.
         </p>
