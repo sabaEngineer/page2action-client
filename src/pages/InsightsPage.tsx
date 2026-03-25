@@ -689,13 +689,6 @@ function NewPage({ bookId, token, onCreated }: {
 
 /* ── Existing page — one big editable text ── */
 
-const AI_LOADING_LABELS: Record<string, string> = {
-  make_longer: 'Making longer...',
-  improve_writing: 'Improving writing...',
-  make_shorter: 'Making shorter...',
-  fix_grammar: 'Fixing grammar...',
-};
-
 function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, onDiscardPreview }: {
   insight: Insight;
   token: string;
