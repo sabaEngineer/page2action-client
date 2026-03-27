@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/auth';
 import { apiFetch } from '../lib/api';
 import type { Book, Insight, InsightStyle } from '../lib/types';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import Placeholder from '@tiptap/extension-placeholder';
 
 /** Book user last edited an insight for, else most recently added book. */
 function pickDefaultBookId(books: Book[], insights: Insight[]): string | null {
@@ -456,7 +461,9 @@ function PageMenu({
   }, [open]);
 
   function handleCopy() {
-    navigator.clipboard.writeText(insight.content);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = insight.content;
+    navigator.clipboard.writeText(tmp.textContent ?? insight.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -631,29 +638,111 @@ function PageMenu({
   );
 }
 
+/* ── Formatting bubble menu (appears on text selection) ── */
+
+function FormatBubble({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  if (!editor) return null;
+  return (
+    <BubbleMenu
+      editor={editor}
+      className="flex items-center gap-0.5 rounded-lg border border-[#d9ceb8] bg-[#f5f0e1] shadow-lg shadow-black/10 px-1 py-0.5"
+    >
+      <FmtBtn
+        active={editor.isActive('bold')}
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        label="B"
+        className="font-bold"
+      />
+      <FmtBtn
+        active={editor.isActive('italic')}
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        label="I"
+        className="italic"
+      />
+      <FmtBtn
+        active={editor.isActive('underline')}
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        label="U"
+        className="underline"
+      />
+      <div className="w-px h-5 bg-[#d9ceb8]/60 mx-0.5" />
+      <FmtBtn
+        active={editor.isActive('bulletList')}
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        label="•"
+        className=""
+      />
+      <FmtBtn
+        active={editor.isActive('blockquote')}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        label="❝"
+        className="text-xs"
+      />
+    </BubbleMenu>
+  );
+}
+
+function FmtBtn({ active, onClick, label, className }: { active: boolean; onClick: () => void; label: string; className?: string }) {
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      className={`w-8 h-8 flex items-center justify-center rounded-md text-sm transition-colors ${
+        active ? 'bg-[#8b4513]/15 text-[#8b4513]' : 'text-[#3b3225] hover:bg-[#8b4513]/5'
+      } ${className ?? ''}`}
+    >
+      {label}
+    </button>
+  );
+}
+
+const TIPTAP_EXTENSIONS = [
+  StarterKit.configure({ heading: false, codeBlock: false, code: false, horizontalRule: false }),
+  Underline,
+];
+
 /* ── New blank page ── */
 
 function NewPage({ bookId, token, onCreated }: {
   bookId: string; token: string; onCreated: (insight: Insight) => void;
 }) {
-  const [content, setContent] = useState('');
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const createdId = useRef<string | null>(null);
+  const latestHtml = useRef('');
 
-  function handleChange(val: string) {
-    setContent(val);
-    clearTimeout(saveTimer.current);
-    if (!val.trim()) return;
-    saveTimer.current = setTimeout(() => void autoSave(val), 1200);
-  }
+  const editor = useEditor({
+    extensions: [
+      ...TIPTAP_EXTENSIONS,
+      Placeholder.configure({ placeholder: 'Start writing...' }),
+    ],
+    editorProps: {
+      attributes: {
+        class: `flex-1 w-full bg-transparent ${paper.text} outline-none text-[15px] leading-[26px] min-h-[400px] prose-sm max-w-none`,
+        style: 'font-family: Georgia, serif',
+      },
+    },
+    autofocus: true,
+    onUpdate: ({ editor: ed }) => {
+      const html = ed.getHTML();
+      latestHtml.current = html;
+      clearTimeout(saveTimer.current);
+      if (!ed.getText().trim()) return;
+      saveTimer.current = setTimeout(() => void autoSave(html), 1200);
+    },
+    onBlur: () => {
+      clearTimeout(saveTimer.current);
+      if (latestHtml.current && editor?.getText().trim()) void autoSave(latestHtml.current);
+    },
+  });
 
-  async function autoSave(val: string) {
-    const trimmed = val.trim();
-    if (!trimmed) return;
+  async function autoSave(html: string) {
+    const text = editor?.getText().trim();
+    if (!text) return;
     if (!createdId.current) {
       const result = await apiFetch<Insight>('/insights', token, {
         method: 'POST',
-        body: JSON.stringify({ content: trimmed, bookId }),
+        body: JSON.stringify({ content: html, bookId }),
       });
       if (result) {
         createdId.current = result.id;
@@ -662,27 +751,15 @@ function NewPage({ bookId, token, onCreated }: {
     } else {
       await apiFetch(`/insights/${createdId.current}`, token, {
         method: 'PATCH',
-        body: JSON.stringify({ content: trimmed }),
+        body: JSON.stringify({ content: html }),
       });
     }
   }
 
-  async function handleBlur() {
-    clearTimeout(saveTimer.current);
-    if (content.trim()) await autoSave(content);
-  }
-
   return (
     <div className="flex flex-col h-full" style={{ fontFamily: 'Georgia, serif' }}>
-      <textarea
-        value={content}
-        onChange={(e) => handleChange(e.target.value)}
-        onBlur={() => void handleBlur()}
-        placeholder="Start writing..."
-        className={`flex-1 w-full bg-transparent ${paper.text} placeholder:${paper.textLight} outline-none resize-none text-[15px] leading-[26px] min-h-[400px]`}
-        style={{ fontFamily: 'Georgia, serif' }}
-        autoFocus
-      />
+      {editor && <FormatBubble editor={editor} />}
+      <EditorContent editor={editor} className="flex-1" />
     </div>
   );
 }
@@ -697,13 +774,38 @@ function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, on
   onAcceptPreview: (content: string) => void;
   onDiscardPreview: () => void;
 }) {
-  const [draft, setDraft] = useState(insight.content);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const latestHtml = useRef(insight.content);
   const [typedLength, setTypedLength] = useState(0);
   const typingTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
+  const editor = useEditor({
+    extensions: TIPTAP_EXTENSIONS,
+    content: insight.content,
+    editorProps: {
+      attributes: {
+        class: `flex-1 w-full bg-transparent ${paper.text} outline-none text-[15px] leading-[26px] min-h-[400px] prose-sm max-w-none`,
+        style: 'font-family: Georgia, serif',
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      const html = ed.getHTML();
+      latestHtml.current = html;
+      clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => void autoSave(html), 1200);
+    },
+    onBlur: () => {
+      clearTimeout(saveTimer.current);
+      void autoSave(latestHtml.current);
+    },
+  });
+
   useEffect(() => {
-    setDraft(insight.content);
+    if (!editor) return;
+    if (editor.getHTML() !== insight.content) {
+      editor.commands.setContent(insight.content);
+      latestHtml.current = insight.content;
+    }
   }, [insight.id, insight.content]);
 
   useEffect(() => {
@@ -728,24 +830,12 @@ function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, on
     return () => clearInterval(typingTimer.current);
   }, [aiPreview]);
 
-  function handleChange(val: string) {
-    setDraft(val);
-    clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => void autoSave(val), 1200);
-  }
-
-  async function autoSave(val: string) {
-    const trimmed = val.trim();
-    if (!trimmed || trimmed === insight.content) return;
+  async function autoSave(html: string) {
+    if (!html || html === insight.content) return;
     await apiFetch(`/insights/${insight.id}`, token, {
       method: 'PATCH',
-      body: JSON.stringify({ content: trimmed }),
+      body: JSON.stringify({ content: html }),
     });
-  }
-
-  async function handleBlur() {
-    clearTimeout(saveTimer.current);
-    await autoSave(draft);
   }
 
   if (aiLoading) {
@@ -792,13 +882,8 @@ function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, on
 
   return (
     <div className="flex flex-col h-full" style={{ fontFamily: 'Georgia, serif' }}>
-      <textarea
-        value={draft}
-        onChange={(e) => handleChange(e.target.value)}
-        onBlur={() => void handleBlur()}
-        className={`flex-1 w-full bg-transparent ${paper.text} outline-none resize-none text-[15px] leading-[26px] min-h-[400px]`}
-        style={{ fontFamily: 'Georgia, serif' }}
-      />
+      {editor && <FormatBubble editor={editor} />}
+      <EditorContent editor={editor} className="flex-1" />
     </div>
   );
 }
