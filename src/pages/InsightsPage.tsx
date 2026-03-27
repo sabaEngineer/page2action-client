@@ -657,28 +657,6 @@ function useIsNarrowScreen() {
   return narrow;
 }
 
-/** Pixels from layout viewport bottom to visual viewport bottom (keyboard / browser chrome). */
-function useVisualViewportBottomInset() {
-  const [bottom, setBottom] = useState(0);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => {
-      setBottom(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
-    };
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    window.addEventListener('resize', update);
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-    };
-  }, []);
-  return bottom;
-}
-
 function FormatToolbarInner({ editor }: { editor: Editor }) {
   return (
     <>
@@ -729,9 +707,8 @@ function FormatBubble({ editor }: { editor: ReturnType<typeof useEditor> }) {
   );
 }
 
-/** Full-width bar pinned just above the on-screen keyboard (Visual Viewport API). */
+/** Full-width bar fixed to the top of the viewport (mobile); stays clear of keyboard and system selection UI. */
 function FormatKeyboardDock({ editor }: { editor: Editor }) {
-  const bottomInset = useVisualViewportBottomInset();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -758,11 +735,10 @@ function FormatKeyboardDock({ editor }: { editor: Editor }) {
 
   const bar = (
     <div
-      className="fixed left-0 right-0 w-full flex items-center justify-evenly gap-1 px-2 py-2 border-t border-[#d9ceb8] bg-[#f5f0e1] shadow-[0_-4px_20px_rgba(0,0,0,0.12)]"
+      className="fixed left-0 right-0 top-0 w-full flex items-center justify-evenly gap-1 px-2 py-2 border-b border-[#d9ceb8] bg-[#f5f0e1] shadow-md shadow-black/15"
       style={{
-        bottom: bottomInset,
-        zIndex: 100,
-        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))',
+        paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
+        zIndex: 200,
       }}
       role="toolbar"
       aria-label="Text formatting"
