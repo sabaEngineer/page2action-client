@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import type { Editor } from '@tiptap/core';
 import { useAuth } from '../context/auth';
 import { apiFetch } from '../lib/api';
@@ -248,6 +247,16 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
   onInsightDeleted: (id: string) => void;
   onInsightUpdated: (id: string, content: string) => void;
 }) {
+  const narrow = useIsNarrowScreen();
+  const [mobileEditor, setMobileEditor] = useState<Editor | null>(null);
+  const handleEditorReady = useCallback((ed: Editor | null) => {
+    setMobileEditor(ed);
+  }, []);
+
+  useEffect(() => {
+    if (!narrow) setMobileEditor(null);
+  }, [narrow]);
+
   const totalPages = insights.length + 1;
   const [page, setPage] = useState(Math.max(insights.length - 1, 0));
   const [fullscreen, setFullscreen] = useState(false);
@@ -289,6 +298,11 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
           )}
         </button>
       </div>
+
+      {/* Mobile format bar: sticky to layout scroll (main) so it stays visible when the page is scrolled; sits above paper inner scroll */}
+      {narrow && mobileEditor ? (
+        <FormatKeyboardDock editor={mobileEditor} />
+      ) : null}
 
       {/* The paper */}
       <div
@@ -354,7 +368,13 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
         {/* Content area */}
         <div className="relative flex-1 px-4 sm:px-8 py-6 sm:pl-16 overflow-y-auto hide-scrollbar" style={{ fontFamily: 'Georgia, serif' }}>
           {isNewPage ? (
-            <NewPage key={book.id} bookId={book.id} token={token} onCreated={onInsightCreated} />
+            <NewPage
+              key={book.id}
+              bookId={book.id}
+              token={token}
+              onCreated={onInsightCreated}
+              onEditorReady={narrow ? handleEditorReady : undefined}
+            />
           ) : currentInsight ? (
             <PageContent
               key={currentInsight.id}
@@ -362,6 +382,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
               token={token}
               aiLoading={aiPageLoading}
               aiPreview={aiPreview}
+              onEditorReady={narrow ? handleEditorReady : undefined}
               onAcceptPreview={(content) => {
                 onInsightUpdated(currentInsight.id, content);
                 void apiFetch(`/insights/${currentInsight.id}`, token, {
@@ -707,53 +728,50 @@ function FormatBubble({ editor }: { editor: ReturnType<typeof useEditor> }) {
   );
 }
 
-/** Full-width bar fixed to the top of the viewport (mobile); stays clear of keyboard and system selection UI. */
+/**
+ * Full-width bar inside BookView flow. Sticky within the app main scroll so it stays visible when the
+ * page is scrolled; not `fixed` to the window (which stayed at the top while the book moved away).
+ * Shown whenever there is a non-empty selection (scroll/touch often drops focus; selection can remain).
+ */
 function FormatKeyboardDock({ editor }: { editor: Editor }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const sync = () => {
       const { from, to } = editor.state.selection;
-      const hasRange = from !== to;
-      setVisible(hasRange && editor.isFocused);
+      setVisible(from !== to);
     };
     sync();
     editor.on('selectionUpdate', sync);
     editor.on('transaction', sync);
     editor.on('focus', sync);
-    const onBlur = () => setVisible(false);
-    editor.on('blur', onBlur);
+    editor.on('blur', sync);
     return () => {
       editor.off('selectionUpdate', sync);
       editor.off('transaction', sync);
       editor.off('focus', sync);
-      editor.off('blur', onBlur);
+      editor.off('blur', sync);
     };
   }, [editor]);
 
-  if (!visible || typeof document === 'undefined') return null;
+  if (!visible) return null;
 
-  const bar = (
+  return (
     <div
-      className="fixed left-0 right-0 top-0 w-full flex items-center justify-evenly gap-1 px-2 py-2 border-b border-[#d9ceb8] bg-[#f5f0e1] shadow-md shadow-black/15"
-      style={{
-        paddingTop: 'max(0.5rem, env(safe-area-inset-top))',
-        zIndex: 200,
-      }}
+      className="sticky z-[100] flex w-full items-center justify-evenly gap-1 px-2 py-2 border border-[#d9ceb8] rounded-lg bg-[#f5f0e1] shadow-md shadow-black/15 shrink-0 mb-2"
+      style={{ top: 'max(0px, env(safe-area-inset-top))' }}
       role="toolbar"
       aria-label="Text formatting"
     >
       <FormatToolbarInner editor={editor} />
     </div>
   );
-
-  return createPortal(bar, document.body);
 }
 
 function FormatToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   const narrow = useIsNarrowScreen();
   if (!editor) return null;
-  if (narrow) return <FormatKeyboardDock editor={editor} />;
+  if (narrow) return null;
   return <FormatBubble editor={editor} />;
 }
 
@@ -821,8 +839,11 @@ const EDITOR_TEXT_CLASS =
 
 /* ── New blank page ── */
 
-function NewPage({ bookId, token, onCreated }: {
-  bookId: string; token: string; onCreated: (insight: Insight) => void;
+function NewPage({ bookId, token, onCreated, onEditorReady }: {
+  bookId: string;
+  token: string;
+  onCreated: (insight: Insight) => void;
+  onEditorReady?: (editor: Editor | null) => void;
 }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const createdId = useRef<string | null>(null);
@@ -852,6 +873,16 @@ function NewPage({ bookId, token, onCreated }: {
       if (latestHtml.current && editor?.getText().trim()) void autoSave(latestHtml.current);
     },
   });
+
+  useEffect(() => {
+    if (!onEditorReady) return;
+    if (!editor) {
+      onEditorReady(null);
+      return;
+    }
+    onEditorReady(editor);
+    return () => onEditorReady(null);
+  }, [editor, onEditorReady]);
 
   async function autoSave(html: string) {
     const text = editor?.getText().trim();
@@ -883,11 +914,12 @@ function NewPage({ bookId, token, onCreated }: {
 
 /* ── Existing page — one big editable text ── */
 
-function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, onDiscardPreview }: {
+function PageContent({ insight, token, aiLoading, aiPreview, onEditorReady, onAcceptPreview, onDiscardPreview }: {
   insight: Insight;
   token: string;
   aiLoading: string | null;
   aiPreview: string | null;
+  onEditorReady?: (editor: Editor | null) => void;
   onAcceptPreview: (content: string) => void;
   onDiscardPreview: () => void;
 }) {
@@ -924,6 +956,16 @@ function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, on
       latestHtml.current = insight.content;
     }
   }, [insight.id, insight.content]);
+
+  useEffect(() => {
+    if (!onEditorReady) return;
+    if (!editor || aiLoading || aiPreview) {
+      onEditorReady(null);
+      return;
+    }
+    onEditorReady(editor);
+    return () => onEditorReady(null);
+  }, [editor, aiLoading, aiPreview, onEditorReady]);
 
   useEffect(() => {
     if (!aiPreview) {
