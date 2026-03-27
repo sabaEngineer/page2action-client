@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import type { Editor } from '@tiptap/core';
 import { useAuth } from '../context/auth';
 import { apiFetch } from '../lib/api';
 import type { Book, Insight, InsightStyle } from '../lib/types';
@@ -7,6 +9,8 @@ import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
+import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import { TextSelection } from '@tiptap/pm/state';
 
 /** Book user last edited an insight for, else most recently added book. */
 function pickDefaultBookId(books: Book[], insights: Insight[]): string | null {
@@ -638,15 +642,46 @@ function PageMenu({
   );
 }
 
-/* ── Formatting bubble menu (appears on text selection) ── */
+/* ── Formatting: bubble (desktop) + full-width dock above keyboard (mobile) ── */
 
-function FormatBubble({ editor }: { editor: ReturnType<typeof useEditor> }) {
-  if (!editor) return null;
+function useIsNarrowScreen() {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const onChange = () => setNarrow(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return narrow;
+}
+
+/** Pixels from layout viewport bottom to visual viewport bottom (keyboard / browser chrome). */
+function useVisualViewportBottomInset() {
+  const [bottom, setBottom] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      setBottom(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+  return bottom;
+}
+
+function FormatToolbarInner({ editor }: { editor: Editor }) {
   return (
-    <BubbleMenu
-      editor={editor}
-      className="flex items-center gap-0.5 rounded-lg border border-[#d9ceb8] bg-[#f5f0e1] shadow-lg shadow-black/10 px-1 py-0.5"
-    >
+    <>
       <FmtBtn
         active={editor.isActive('bold')}
         onClick={() => editor.chain().focus().toggleBold().run()}
@@ -665,7 +700,7 @@ function FormatBubble({ editor }: { editor: ReturnType<typeof useEditor> }) {
         label="U"
         className="underline"
       />
-      <div className="w-px h-5 bg-[#d9ceb8]/60 mx-0.5" />
+      <div className="w-px h-7 bg-[#d9ceb8]/60 shrink-0 max-sm:hidden" aria-hidden />
       <FmtBtn
         active={editor.isActive('bulletList')}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -678,18 +713,83 @@ function FormatBubble({ editor }: { editor: ReturnType<typeof useEditor> }) {
         label="❝"
         className="text-xs"
       />
+    </>
+  );
+}
+
+function FormatBubble({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  if (!editor) return null;
+  return (
+    <BubbleMenu
+      editor={editor}
+      className="flex items-center gap-0.5 rounded-lg border border-[#d9ceb8] bg-[#f5f0e1] shadow-lg shadow-black/10 px-1 py-0.5"
+    >
+      <FormatToolbarInner editor={editor} />
     </BubbleMenu>
   );
+}
+
+/** Full-width bar pinned just above the on-screen keyboard (Visual Viewport API). */
+function FormatKeyboardDock({ editor }: { editor: Editor }) {
+  const bottomInset = useVisualViewportBottomInset();
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const sync = () => {
+      const { from, to } = editor.state.selection;
+      const hasRange = from !== to;
+      setVisible(hasRange && editor.isFocused);
+    };
+    sync();
+    editor.on('selectionUpdate', sync);
+    editor.on('transaction', sync);
+    editor.on('focus', sync);
+    const onBlur = () => setVisible(false);
+    editor.on('blur', onBlur);
+    return () => {
+      editor.off('selectionUpdate', sync);
+      editor.off('transaction', sync);
+      editor.off('focus', sync);
+      editor.off('blur', onBlur);
+    };
+  }, [editor]);
+
+  if (!visible || typeof document === 'undefined') return null;
+
+  const bar = (
+    <div
+      className="fixed left-0 right-0 w-full flex items-center justify-evenly gap-1 px-2 py-2 border-t border-[#d9ceb8] bg-[#f5f0e1] shadow-[0_-4px_20px_rgba(0,0,0,0.12)]"
+      style={{
+        bottom: bottomInset,
+        zIndex: 100,
+        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))',
+      }}
+      role="toolbar"
+      aria-label="Text formatting"
+    >
+      <FormatToolbarInner editor={editor} />
+    </div>
+  );
+
+  return createPortal(bar, document.body);
+}
+
+function FormatToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const narrow = useIsNarrowScreen();
+  if (!editor) return null;
+  if (narrow) return <FormatKeyboardDock editor={editor} />;
+  return <FormatBubble editor={editor} />;
 }
 
 function FmtBtn({ active, onClick, label, className }: { active: boolean; onClick: () => void; label: string; className?: string }) {
   return (
     <button
       type="button"
+      onPointerDown={(e) => e.preventDefault()}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className={`w-8 h-8 flex items-center justify-center rounded-md text-sm transition-colors ${
-        active ? 'bg-[#8b4513]/15 text-[#8b4513]' : 'text-[#3b3225] hover:bg-[#8b4513]/5'
+      className={`min-w-[44px] min-h-[44px] sm:min-w-8 sm:min-h-8 flex flex-1 sm:flex-none items-center justify-center rounded-md text-base sm:text-sm transition-colors touch-manipulation ${
+        active ? 'bg-[#8b4513]/15 text-[#8b4513]' : 'text-[#3b3225] active:bg-[#8b4513]/10'
       } ${className ?? ''}`}
     >
       {label}
@@ -697,10 +797,51 @@ function FmtBtn({ active, onClick, label, className }: { active: boolean; onClic
   );
 }
 
+/** `---` + Enter (or the built-in `---` input rule) → full-width divider. */
+const InsightHorizontalRule = HorizontalRule.extend({
+  addKeyboardShortcuts() {
+    return {
+      Enter: ({ editor }) => {
+        const { state } = editor;
+        const { $from } = state.selection;
+        let d = $from.depth;
+        while (d > 0 && $from.node(d).type.name !== 'paragraph') d -= 1;
+        if (d <= 0 || $from.node(d).type.name !== 'paragraph') return false;
+
+        const pStart = $from.start(d);
+        const pEnd = $from.end(d);
+        const text = state.doc.textBetween(pStart, pEnd, '', '').trim();
+        if (text !== '---') return false;
+
+        const hrType = state.schema.nodes.horizontalRule;
+        const pType = state.schema.nodes.paragraph;
+        if (!hrType || !pType) return false;
+
+        const from = $from.before(d);
+        const to = $from.after(d);
+        const hrNode = hrType.create();
+        const nextP = pType.create();
+        const tr = state.tr.replaceWith(from, to, [hrNode, nextP]);
+        const cursorPos = from + hrNode.nodeSize + 1;
+        tr.setSelection(TextSelection.near(tr.doc.resolve(cursorPos)));
+        editor.view.dispatch(tr);
+        return true;
+      },
+    };
+  },
+}).configure({
+  HTMLAttributes: { class: 'insight-hr' },
+});
+
 const TIPTAP_EXTENSIONS = [
   StarterKit.configure({ heading: false, codeBlock: false, code: false, horizontalRule: false }),
   Underline,
+  InsightHorizontalRule,
 ];
+
+/** 16px+ on small screens stops iOS Safari from zooming the viewport when the editor is focused. */
+const EDITOR_TEXT_CLASS =
+  'flex-1 w-full bg-transparent outline-none text-[16px] leading-[26px] min-h-[400px] max-w-none sm:text-[15px]';
 
 /* ── New blank page ── */
 
@@ -718,11 +859,11 @@ function NewPage({ bookId, token, onCreated }: {
     ],
     editorProps: {
       attributes: {
-        class: `flex-1 w-full bg-transparent ${paper.text} outline-none text-[15px] leading-[26px] min-h-[400px] prose-sm max-w-none`,
+        class: `${EDITOR_TEXT_CLASS} ${paper.text}`,
         style: 'font-family: Georgia, serif',
       },
     },
-    autofocus: true,
+    autofocus: typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches,
     onUpdate: ({ editor: ed }) => {
       const html = ed.getHTML();
       latestHtml.current = html;
@@ -758,7 +899,7 @@ function NewPage({ bookId, token, onCreated }: {
 
   return (
     <div className="flex flex-col h-full" style={{ fontFamily: 'Georgia, serif' }}>
-      {editor && <FormatBubble editor={editor} />}
+      {editor && <FormatToolbar editor={editor} />}
       <EditorContent editor={editor} className="flex-1" />
     </div>
   );
@@ -784,7 +925,7 @@ function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, on
     content: insight.content,
     editorProps: {
       attributes: {
-        class: `flex-1 w-full bg-transparent ${paper.text} outline-none text-[15px] leading-[26px] min-h-[400px] prose-sm max-w-none`,
+        class: `${EDITOR_TEXT_CLASS} ${paper.text}`,
         style: 'font-family: Georgia, serif',
       },
     },
@@ -852,7 +993,7 @@ function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, on
 
     return (
       <div className="flex flex-col h-full" style={{ fontFamily: 'Georgia, serif' }}>
-        <div className="flex-1 w-full text-[15px] leading-[26px] min-h-[400px] whitespace-pre-wrap text-[#3b3225]">
+        <div className="flex-1 w-full text-[16px] leading-[26px] min-h-[400px] whitespace-pre-wrap text-[#3b3225] sm:text-[15px]">
           {displayed}
           {!done && <span className="inline-block w-[2px] h-[1em] bg-[#8b4513] align-text-bottom animate-pulse ml-px" />}
         </div>
@@ -882,7 +1023,7 @@ function PageContent({ insight, token, aiLoading, aiPreview, onAcceptPreview, on
 
   return (
     <div className="flex flex-col h-full" style={{ fontFamily: 'Georgia, serif' }}>
-      {editor && <FormatBubble editor={editor} />}
+      {editor && <FormatToolbar editor={editor} />}
       <EditorContent editor={editor} className="flex-1" />
     </div>
   );

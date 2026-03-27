@@ -51,3 +51,14 @@ body {
   color: #6b5d4d;
   font-style: italic;
 }
+
+/* Horizontal rule: --- + Enter */
+.tiptap hr.insight-hr,
+.tiptap hr {
+  border: none;
+  border-top: 2px solid #1c1917;
+  margin: 0.75rem 0;
+  width: 100%;
+  max-width: 100%;
+  background: transparent;
+}
