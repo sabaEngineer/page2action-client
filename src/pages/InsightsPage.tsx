@@ -486,15 +486,9 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
         </div>
 
         {fullscreen ? (
-          /* Sticky top header + scroll body + sticky bottom Prev/Next */
-          <div
-            ref={contentScrollRef}
-            className="flex min-h-0 flex-1 flex-col overflow-y-auto hide-scrollbar"
-            style={{
-              scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
-            }}
-          >
-            <div className={`sticky top-0 z-20 shrink-0 ${paper.bg} shadow-[0_4px_12px_rgba(0,0,0,0.06)]`}>
+          /* Flex column: header + scrollable body + footer pinned to paper bottom */
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className={`relative z-20 shrink-0 ${paper.bg} shadow-[0_4px_12px_rgba(0,0,0,0.06)]`}>
               <div
                 className={`relative flex min-w-0 border-b ${paper.border} px-4 pt-5 pb-3 sm:px-8 ${
                   narrow ? 'items-center justify-between gap-2' : 'items-center gap-3'
@@ -546,46 +540,54 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
             </div>
 
             <div
-              className="relative px-4 py-6 sm:px-8 sm:pl-16"
+              ref={contentScrollRef}
+              className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
               style={{
-                fontFamily: 'Georgia, serif',
-                paddingBottom:
-                  narrow && keyboardPadPx > 0
-                    ? `${Math.min(keyboardPadPx + 64, 400)}px`
-                    : undefined,
+                scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
               }}
             >
-              {isNewPage ? (
-                <NewPage
-                  key={book.id}
-                  bookId={book.id}
-                  token={token}
-                  onCreated={onInsightCreated}
-                  onEditorReady={narrow ? handleEditorReady : undefined}
-                />
-              ) : currentInsight ? (
-                <PageContent
-                  key={currentInsight.id}
-                  insight={currentInsight}
-                  token={token}
-                  aiLoading={aiPageLoading}
-                  aiPreview={aiPreview}
-                  onEditorReady={narrow ? handleEditorReady : undefined}
-                  onAcceptPreview={(content) => {
-                    onInsightUpdated(currentInsight.id, content);
-                    void apiFetch(`/insights/${currentInsight.id}`, token, {
-                      method: 'PATCH',
-                      body: JSON.stringify({ content }),
-                    });
-                    setAiPreview(null);
-                  }}
-                  onDiscardPreview={() => setAiPreview(null)}
-                />
-              ) : null}
+              <div
+                className="relative px-4 py-6 sm:px-8 sm:pl-16"
+                style={{
+                  fontFamily: 'Georgia, serif',
+                  paddingBottom:
+                    narrow && keyboardPadPx > 0
+                      ? `${Math.min(keyboardPadPx + 64, 400)}px`
+                      : undefined,
+                }}
+              >
+                {isNewPage ? (
+                  <NewPage
+                    key={book.id}
+                    bookId={book.id}
+                    token={token}
+                    onCreated={onInsightCreated}
+                    onEditorReady={narrow ? handleEditorReady : undefined}
+                  />
+                ) : currentInsight ? (
+                  <PageContent
+                    key={currentInsight.id}
+                    insight={currentInsight}
+                    token={token}
+                    aiLoading={aiPageLoading}
+                    aiPreview={aiPreview}
+                    onEditorReady={narrow ? handleEditorReady : undefined}
+                    onAcceptPreview={(content) => {
+                      onInsightUpdated(currentInsight.id, content);
+                      void apiFetch(`/insights/${currentInsight.id}`, token, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ content }),
+                      });
+                      setAiPreview(null);
+                    }}
+                    onDiscardPreview={() => setAiPreview(null)}
+                  />
+                ) : null}
+              </div>
             </div>
 
             <div
-              className={`sticky bottom-0 z-20 flex shrink-0 items-center justify-between border-t ${paper.border} ${paper.bg} px-6 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]`}
+              className={`relative z-10 flex shrink-0 items-center justify-between border-t ${paper.border} ${paper.bg} px-6 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]`}
               style={{ fontFamily: 'Georgia, serif' }}
             >
               <button
@@ -616,14 +618,8 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
             </div>
           </div>
         ) : (
-          <div
-            ref={contentScrollRef}
-            className="flex min-h-0 flex-1 flex-col overflow-y-auto hide-scrollbar"
-            style={{
-              scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
-            }}
-          >
-            <div className={`sticky top-0 z-20 shrink-0 ${paper.bg} shadow-[0_4px_12px_rgba(0,0,0,0.06)]`}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className={`relative z-20 shrink-0 ${paper.bg} shadow-[0_4px_12px_rgba(0,0,0,0.06)]`}>
               <div
                 className={`relative flex min-w-0 border-b ${paper.border} px-4 pt-5 pb-3 sm:px-8 ${
                   narrow ? 'items-center justify-between gap-2' : 'items-center justify-between'
@@ -674,46 +670,54 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
             </div>
 
             <div
-              className="relative px-4 py-6 sm:px-8 sm:pl-16"
+              ref={contentScrollRef}
+              className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
               style={{
-                fontFamily: 'Georgia, serif',
-                paddingBottom:
-                  narrow && keyboardPadPx > 0
-                    ? `${Math.min(keyboardPadPx + 64, 400)}px`
-                    : undefined,
+                scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
               }}
             >
-              {isNewPage ? (
-                <NewPage
-                  key={book.id}
-                  bookId={book.id}
-                  token={token}
-                  onCreated={onInsightCreated}
-                  onEditorReady={narrow ? handleEditorReady : undefined}
-                />
-              ) : currentInsight ? (
-                <PageContent
-                  key={currentInsight.id}
-                  insight={currentInsight}
-                  token={token}
-                  aiLoading={aiPageLoading}
-                  aiPreview={aiPreview}
-                  onEditorReady={narrow ? handleEditorReady : undefined}
-                  onAcceptPreview={(content) => {
-                    onInsightUpdated(currentInsight.id, content);
-                    void apiFetch(`/insights/${currentInsight.id}`, token, {
-                      method: 'PATCH',
-                      body: JSON.stringify({ content }),
-                    });
-                    setAiPreview(null);
-                  }}
-                  onDiscardPreview={() => setAiPreview(null)}
-                />
-              ) : null}
+              <div
+                className="relative px-4 py-6 sm:px-8 sm:pl-16"
+                style={{
+                  fontFamily: 'Georgia, serif',
+                  paddingBottom:
+                    narrow && keyboardPadPx > 0
+                      ? `${Math.min(keyboardPadPx + 64, 400)}px`
+                      : undefined,
+                }}
+              >
+                {isNewPage ? (
+                  <NewPage
+                    key={book.id}
+                    bookId={book.id}
+                    token={token}
+                    onCreated={onInsightCreated}
+                    onEditorReady={narrow ? handleEditorReady : undefined}
+                  />
+                ) : currentInsight ? (
+                  <PageContent
+                    key={currentInsight.id}
+                    insight={currentInsight}
+                    token={token}
+                    aiLoading={aiPageLoading}
+                    aiPreview={aiPreview}
+                    onEditorReady={narrow ? handleEditorReady : undefined}
+                    onAcceptPreview={(content) => {
+                      onInsightUpdated(currentInsight.id, content);
+                      void apiFetch(`/insights/${currentInsight.id}`, token, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ content }),
+                      });
+                      setAiPreview(null);
+                    }}
+                    onDiscardPreview={() => setAiPreview(null)}
+                  />
+                ) : null}
+              </div>
             </div>
 
             <div
-              className={`sticky bottom-0 z-20 flex shrink-0 items-center justify-between border-t ${paper.border} ${paper.bg} px-6 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]`}
+              className={`relative z-10 flex shrink-0 items-center justify-between border-t ${paper.border} ${paper.bg} px-6 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]`}
               style={{ fontFamily: 'Georgia, serif' }}
             >
               <button
