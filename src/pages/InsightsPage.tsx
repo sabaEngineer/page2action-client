@@ -340,6 +340,58 @@ function useMobileSelectionScrollIntoView(
   }, [editor, enabled, scrollRootRef]);
 }
 
+/**
+ * Mobile typing: small scroll steps (~1 line) when the caret nears the visible bottom,
+ * so the next line peeks into view — without large jumps or visualViewport scroll churn.
+ */
+function useGentleTypingCaretScroll(
+  editor: Editor | null,
+  scrollRootRef: RefObject<HTMLElement | null> | undefined,
+  enabled: boolean,
+) {
+  useEffect(() => {
+    if (!enabled || !editor || !scrollRootRef) return;
+
+    const THROTTLE_MS = 95;
+    const ZONE_PX = 118;
+    const STEP_PX = 28;
+
+    let lastAt = 0;
+
+    const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+      if (!transaction.docChanged) return;
+      if (!editor.state.selection.empty) return;
+
+      const now = Date.now();
+      if (now - lastAt < THROTTLE_MS) return;
+
+      const vv = window.visualViewport;
+      const scrollEl = scrollRootRef.current;
+      if (!vv || !scrollEl) return;
+
+      lastAt = now;
+
+      requestAnimationFrame(() => {
+        if (editor.isDestroyed) return;
+        const head = editor.state.selection.head;
+        const coords = editor.view.coordsAtPos(head);
+        const visibleBottom = vv.offsetTop + vv.height;
+        if (coords.bottom <= visibleBottom - ZONE_PX) return;
+
+        scrollEl.scrollTop = Math.min(
+          scrollEl.scrollHeight - scrollEl.clientHeight,
+          scrollEl.scrollTop + STEP_PX,
+        );
+      });
+    };
+
+    editor.on('transaction', onTransaction);
+    return () => {
+      editor.off('transaction', onTransaction);
+    };
+  }, [editor, enabled, scrollRootRef]);
+}
+
 /* ═══════════════════════════════════════════════════════
    Book view — parchment paper with old-style feel
    ═══════════════════════════════════════════════════════ */
@@ -577,6 +629,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                     key={book.id}
                     bookId={book.id}
                     token={token}
+                    scrollRootRef={contentScrollRef}
                     onCreated={onInsightCreated}
                     onEditorReady={narrow ? handleEditorReady : undefined}
                   />
@@ -585,6 +638,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                     key={currentInsight.id}
                     insight={currentInsight}
                     token={token}
+                    scrollRootRef={contentScrollRef}
                     aiLoading={aiPageLoading}
                     aiPreview={aiPreview}
                     onEditorReady={narrow ? handleEditorReady : undefined}
@@ -707,6 +761,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                     key={book.id}
                     bookId={book.id}
                     token={token}
+                    scrollRootRef={contentScrollRef}
                     onCreated={onInsightCreated}
                     onEditorReady={narrow ? handleEditorReady : undefined}
                   />
@@ -715,6 +770,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                     key={currentInsight.id}
                     insight={currentInsight}
                     token={token}
+                    scrollRootRef={contentScrollRef}
                     aiLoading={aiPageLoading}
                     aiPreview={aiPreview}
                     onEditorReady={narrow ? handleEditorReady : undefined}
@@ -1267,15 +1323,17 @@ function mobileEditorScrollProps(): { handleScrollToSelection?: () => boolean } 
 
 /* ── New blank page ── */
 
-function NewPage({ bookId, token, onCreated, onEditorReady }: {
+function NewPage({ bookId, token, onCreated, onEditorReady, scrollRootRef }: {
   bookId: string;
   token: string;
   onCreated: (insight: Insight) => void;
   onEditorReady?: (editor: Editor | null) => void;
+  scrollRootRef?: RefObject<HTMLElement | null>;
 }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const createdId = useRef<string | null>(null);
   const latestHtml = useRef('');
+  const narrow = useIsNarrowScreen();
 
   const editor = useEditor({
     extensions: [
@@ -1302,6 +1360,8 @@ function NewPage({ bookId, token, onCreated, onEditorReady }: {
       if (latestHtml.current && editor?.getText().trim()) void autoSave(latestHtml.current);
     },
   });
+
+  useGentleTypingCaretScroll(editor, scrollRootRef, Boolean(scrollRootRef && narrow));
 
   useEffect(() => {
     if (!onEditorReady) return;
@@ -1343,7 +1403,7 @@ function NewPage({ bookId, token, onCreated, onEditorReady }: {
 
 /* ── Existing page — one big editable text ── */
 
-function PageContent({ insight, token, aiLoading, aiPreview, onEditorReady, onAcceptPreview, onDiscardPreview }: {
+function PageContent({ insight, token, aiLoading, aiPreview, onEditorReady, onAcceptPreview, onDiscardPreview, scrollRootRef }: {
   insight: Insight;
   token: string;
   aiLoading: string | null;
@@ -1351,11 +1411,13 @@ function PageContent({ insight, token, aiLoading, aiPreview, onEditorReady, onAc
   onEditorReady?: (editor: Editor | null) => void;
   onAcceptPreview: (content: string) => void;
   onDiscardPreview: () => void;
+  scrollRootRef?: RefObject<HTMLElement | null>;
 }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const latestHtml = useRef(insight.content);
   const [typedLength, setTypedLength] = useState(0);
   const typingTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const narrow = useIsNarrowScreen();
 
   const editor = useEditor({
     extensions: TIPTAP_EXTENSIONS,
@@ -1378,6 +1440,12 @@ function PageContent({ insight, token, aiLoading, aiPreview, onEditorReady, onAc
       void autoSave(latestHtml.current);
     },
   });
+
+  useGentleTypingCaretScroll(
+    editor,
+    scrollRootRef,
+    Boolean(scrollRootRef && narrow && !aiLoading && !aiPreview),
+  );
 
   useEffect(() => {
     if (!editor) return;
