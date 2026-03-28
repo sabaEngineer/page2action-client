@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useAuth } from '../context/auth';
+import { useImmersiveFullscreenOptional } from '../context/immersive-fullscreen-context';
 import { apiFetch } from '../lib/api';
 import type { Book, Insight, InsightStyle } from '../lib/types';
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -48,6 +49,7 @@ const paper = {
 
 export default function InsightsPage() {
   const { token } = useAuth();
+  const immersive = useImmersiveFullscreenOptional()?.immersive ?? false;
   const [insights, setInsights] = useState<Insight[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,8 +115,12 @@ export default function InsightsPage() {
     .sort((a, b) => a.position - b.position);
 
   return (
-    <section className="text-left">
-      <h2 className="text-xl font-semibold text-white mb-4">Insights</h2>
+    <section
+      className={`text-left min-h-0 ${
+        immersive ? 'flex h-full min-h-0 flex-col' : 'flex flex-1 flex-col overflow-hidden'
+      }`}
+    >
+      {!immersive ? <h2 className="text-xl font-semibold text-white mb-4">Insights</h2> : null}
       <BookView
         book={book}
         books={booksSorted}
@@ -234,6 +240,96 @@ function BookPicker({
 }
 
 /* ═══════════════════════════════════════════════════════
+   Mobile: room above keyboard + keep selection in view
+   ═══════════════════════════════════════════════════════ */
+
+/** Extra scrollable padding when the on-screen keyboard shrinks the visual viewport. */
+function usePaperKeyboardPadding(enabled: boolean) {
+  const [padPx, setPadPx] = useState(0);
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') {
+      setPadPx(0);
+      return;
+    }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setPadPx(inset);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [enabled]);
+  return padPx;
+}
+
+/** After selecting text, scroll the paper so the range sits above the keyboard (not under it). */
+function useMobileSelectionScrollIntoView(
+  editor: Editor | null,
+  scrollRootRef: RefObject<HTMLElement | null>,
+  enabled: boolean,
+) {
+  useEffect(() => {
+    if (!enabled || !editor) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const nudge = () => {
+      const scrollEl = scrollRootRef.current;
+      if (!scrollEl) return;
+      const { from, to } = editor.state.selection;
+      if (from === to) return;
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const view = editor.view;
+          const a = view.coordsAtPos(from);
+          const b = view.coordsAtPos(to);
+          const top = Math.min(a.top, b.top);
+          const bottom = Math.max(a.bottom, b.bottom);
+
+          const visibleBottom = vv.offsetTop + vv.height;
+          const marginAboveKb = 88;
+          const targetBottom = visibleBottom - marginAboveKb;
+          if (bottom > targetBottom) {
+            const delta = bottom - targetBottom + 12;
+            scrollEl.scrollTop = Math.min(
+              scrollEl.scrollHeight - scrollEl.clientHeight,
+              scrollEl.scrollTop + delta,
+            );
+          }
+
+          const visibleTop = vv.offsetTop + 12;
+          if (top < visibleTop) {
+            const deltaUp = visibleTop - top + 12;
+            scrollEl.scrollTop = Math.max(0, scrollEl.scrollTop - deltaUp);
+          }
+        });
+      });
+    };
+
+    editor.on('selectionUpdate', nudge);
+    editor.on('focus', nudge);
+    vv.addEventListener('resize', nudge);
+    vv.addEventListener('scroll', nudge);
+
+    return () => {
+      editor.off('selectionUpdate', nudge);
+      editor.off('focus', nudge);
+      vv.removeEventListener('resize', nudge);
+      vv.removeEventListener('scroll', nudge);
+    };
+  }, [editor, enabled, scrollRootRef]);
+}
+
+/* ═══════════════════════════════════════════════════════
    Book view — parchment paper with old-style feel
    ═══════════════════════════════════════════════════════ */
 
@@ -249,9 +345,13 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
 }) {
   const narrow = useIsNarrowScreen();
   const [mobileEditor, setMobileEditor] = useState<Editor | null>(null);
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  const keyboardPadPx = usePaperKeyboardPadding(narrow);
   const handleEditorReady = useCallback((ed: Editor | null) => {
     setMobileEditor(ed);
   }, []);
+
+  useMobileSelectionScrollIntoView(narrow ? mobileEditor : null, contentScrollRef, narrow);
 
   useEffect(() => {
     if (!narrow) setMobileEditor(null);
@@ -271,43 +371,98 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
   const isNewPage = page === insights.length;
   const currentInsight = isNewPage ? null : insights[page];
 
+  const insightPageMenu =
+    !isNewPage && currentInsight ? (
+      <PageMenu
+        insight={currentInsight}
+        token={token}
+        onStyleChanged={(s) => {
+          currentInsight.style = s;
+        }}
+        onDelete={() => {
+          onInsightDeleted(currentInsight.id);
+          setPage((p) => Math.max(0, p - 1));
+          void apiFetch(`/insights/${currentInsight.id}`, token, { method: 'DELETE' });
+        }}
+        onAiEdit={async (action) => {
+          setAiPageLoading(action);
+          try {
+            const result = await apiFetch<{ content: string }>(`/insights/${currentInsight.id}/ai-edit`, token, {
+              method: 'POST',
+              body: JSON.stringify({ action }),
+            });
+            if (result?.content) setAiPreview(result.content);
+          } finally {
+            setAiPageLoading(null);
+          }
+        }}
+        aiBusy={aiPageLoading !== null || aiPreview !== null}
+      />
+    ) : null;
+
+  const immersiveMobile = narrow && fullscreen;
+  const setImmersiveChrome = useImmersiveFullscreenOptional()?.setImmersive;
+
+  useEffect(() => {
+    if (!setImmersiveChrome) return;
+    setImmersiveChrome(!!immersiveMobile);
+    return () => setImmersiveChrome(false);
+  }, [immersiveMobile, setImmersiveChrome]);
+
   const wrapperClass = fullscreen
-    ? 'fixed inset-0 z-[60] flex flex-col bg-gray-950 min-h-0'
-    : 'max-w-2xl mx-auto flex flex-col';
+    ? immersiveMobile
+      ? 'fixed inset-0 z-[100] flex flex-col min-h-0 w-full h-[100dvh] max-h-[100dvh] relative bg-[#f5f0e1] pb-[env(safe-area-inset-bottom)]'
+      : 'fixed inset-0 z-[60] flex flex-col bg-gray-950 min-h-0'
+    : 'max-w-2xl mx-auto flex w-full min-h-0 flex-1 flex-col';
 
   return (
     <div className={wrapperClass}>
-      {/* Book picker + fullscreen */}
-      <div className="flex items-center gap-2 sm:gap-3 px-0 sm:px-2 py-3 shrink-0">
-        <BookPicker book={book} books={books} onBookChange={onBookChange} />
-
-        {/* Fullscreen toggle */}
+      {/* Immersive mobile: no top chrome — only a floating exit; book picker is hidden */}
+      {immersiveMobile ? (
         <button
-          onClick={() => setFullscreen((f) => !f)}
-          className="shrink-0 text-gray-500 hover:text-white transition-colors p-1.5 rounded-md hover:bg-white/10"
-          title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          type="button"
+          onClick={() => setFullscreen(false)}
+          className="absolute z-[120] top-[max(8px,env(safe-area-inset-top))] right-[max(8px,env(safe-area-inset-right))] p-2.5 rounded-full bg-[#3b3225]/35 text-white shadow-lg backdrop-blur-md active:scale-95"
+          title="Exit fullscreen"
+          aria-label="Exit fullscreen"
         >
-          {fullscreen ? (
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 9L4 4m0 0v4m0-4h4m7 11l5 5m0 0v-4m0 4h-4M9 15l-5 5m0 0h4m-4 0v-4m11-7l5-5m0 0h-4m4 0v4" />
-            </svg>
-          ) : (
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-            </svg>
-          )}
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 9L4 4m0 0v4m0-4h4m7 11l5 5m0 0v-4m0 4h-4M9 15l-5 5m0 0h4m-4 0v-4m11-7l5-5m0 0h-4m4 0v4" />
+          </svg>
         </button>
-      </div>
+      ) : null}
 
-      {/* Mobile format bar: sticky to layout scroll (main) so it stays visible when the page is scrolled; sits above paper inner scroll */}
-      {narrow && mobileEditor ? (
-        <FormatKeyboardDock editor={mobileEditor} />
+      {/* Book picker + fullscreen (hidden in immersive mobile) */}
+      {!immersiveMobile ? (
+        <div className="flex items-center gap-2 sm:gap-3 py-3 shrink-0 px-0 sm:px-2">
+          <BookPicker book={book} books={books} onBookChange={onBookChange} />
+
+          <button
+            onClick={() => setFullscreen((f) => !f)}
+            className="shrink-0 text-gray-500 hover:text-white transition-colors p-1.5 rounded-md hover:bg-white/10"
+            title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            {fullscreen ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 9L4 4m0 0v4m0-4h4m7 11l5 5m0 0v-4m0 4h-4M9 15l-5 5m0 0h4m-4 0v-4m11-7l5-5m0 0h-4m4 0v4" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+              </svg>
+            )}
+          </button>
+        </div>
       ) : null}
 
       {/* The paper */}
       <div
-        className={`relative rounded-sm ${paper.bg} bg-gradient-to-b ${paper.bgGrad} shadow-2xl flex flex-col overflow-hidden min-h-0 ${
-          fullscreen ? 'flex-1 mx-4 mb-4' : 'min-h-[560px] mx-0'
+        className={`relative ${paper.bg} bg-gradient-to-b ${paper.bgGrad} shadow-2xl flex flex-col overflow-hidden min-h-0 ${
+          fullscreen
+            ? immersiveMobile
+              ? 'flex-1 m-0 w-full min-h-0 rounded-none'
+              : 'flex-1 mx-4 mb-4 rounded-sm'
+            : 'min-h-0 flex-1 mx-0 rounded-sm'
         }`}
         style={{
           boxShadow: '4px 4px 20px rgba(0,0,0,0.5), inset 0 0 60px rgba(139,69,19,0.04)',
@@ -333,40 +488,80 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
           ))}
         </div>
 
-        {/* Top decoration */}
-        <div className={`relative px-8 pt-5 pb-3 border-b ${paper.border} flex items-center justify-between`}>
-          <span className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted}`} style={{ fontFamily: 'Georgia, serif' }}>
-            {isNewPage ? 'New Page' : `Page ${page + 1}`}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className={`text-[10px] ${paper.textLight}`} style={{ fontFamily: 'Georgia, serif' }}>
-              {book.title}
-            </span>
-            {!isNewPage && currentInsight && (
-              <PageMenu insight={currentInsight} token={token} onStyleChanged={(s) => {
-                currentInsight.style = s;
-              }} onDelete={() => {
-                onInsightDeleted(currentInsight.id);
-                setPage((p) => Math.max(0, p - 1));
-                void apiFetch(`/insights/${currentInsight.id}`, token, { method: 'DELETE' });
-              }} onAiEdit={async (action) => {
-                setAiPageLoading(action);
-                try {
-                  const result = await apiFetch<{ content: string }>(`/insights/${currentInsight.id}/ai-edit`, token, {
-                    method: 'POST',
-                    body: JSON.stringify({ action }),
-                  });
-                  if (result?.content) setAiPreview(result.content);
-                } finally {
-                  setAiPageLoading(null);
-                }
-              }} aiBusy={aiPageLoading !== null || aiPreview !== null} />
-            )}
-          </div>
+        {/* Top decoration — mobile: format toolbar is absolute (overlay) so selecting text never grows this row or pushes body */}
+        <div
+          className={`relative border-b ${paper.border} px-4 pt-5 pb-3 sm:px-8 flex min-w-0 ${
+            narrow ? 'items-center justify-between gap-2' : `items-center ${fullscreen ? 'gap-3' : 'justify-between'}`
+          }`}
+        >
+          {narrow ? (
+            <>
+              <span
+                className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
+                style={{ fontFamily: 'Georgia, serif' }}
+              >
+                {isNewPage ? 'New Page' : `Page ${page + 1}`}
+              </span>
+              <div
+                className={`flex min-w-0 flex-1 items-center justify-end gap-2 ${
+                  immersiveMobile
+                    ? 'pr-[max(2.75rem,calc(env(safe-area-inset-right)+2.25rem))]'
+                    : ''
+                }`}
+              >
+                <span
+                  className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-right`}
+                  style={{ fontFamily: 'Georgia, serif' }}
+                >
+                  {book.title}
+                </span>
+                <span className="shrink-0">{insightPageMenu}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <span
+                className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
+                style={{ fontFamily: 'Georgia, serif' }}
+              >
+                {isNewPage ? 'New Page' : `Page ${page + 1}`}
+              </span>
+              {fullscreen ? (
+                <>
+                  {insightPageMenu}
+                  <span
+                    className={`text-[10px] ${paper.textLight} truncate min-w-0 flex-1 text-left`}
+                    style={{ fontFamily: 'Georgia, serif' }}
+                  >
+                    {book.title}
+                  </span>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 shrink-0 min-w-0 max-w-[55%] sm:max-w-none">
+                  <span className={`text-[10px] ${paper.textLight} truncate`} style={{ fontFamily: 'Georgia, serif' }}>
+                    {book.title}
+                  </span>
+                  {insightPageMenu}
+                </div>
+              )}
+            </>
+          )}
+          {narrow && mobileEditor ? <MobileHeaderFormatOverlay editor={mobileEditor} /> : null}
         </div>
 
-        {/* Content area */}
-        <div className="relative flex-1 px-4 sm:px-8 py-6 sm:pl-16 overflow-y-auto hide-scrollbar" style={{ fontFamily: 'Georgia, serif' }}>
+        {/* Content area — bottom padding + selection nudge when keyboard shrinks the visual viewport */}
+        <div
+          ref={contentScrollRef}
+          className="relative flex-1 px-4 sm:px-8 py-6 sm:pl-16 overflow-y-auto hide-scrollbar"
+          style={{
+            fontFamily: 'Georgia, serif',
+            paddingBottom:
+              narrow && keyboardPadPx > 0
+                ? `${Math.min(keyboardPadPx + 64, 400)}px`
+                : undefined,
+            scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
+          }}
+        >
           {isNewPage ? (
             <NewPage
               key={book.id}
@@ -663,7 +858,7 @@ function PageMenu({
   );
 }
 
-/* ── Formatting: bubble (desktop) + full-width dock above keyboard (mobile) ── */
+/* ── Formatting: bubble (desktop) + absolute overlay on paper header (mobile, when selection) ── */
 
 function useIsNarrowScreen() {
   const [narrow, setNarrow] = useState(() =>
@@ -678,35 +873,43 @@ function useIsNarrowScreen() {
   return narrow;
 }
 
-function FormatToolbarInner({ editor }: { editor: Editor }) {
+function FormatToolbarInner({ editor, compact }: { editor: Editor; compact?: boolean }) {
   return (
     <>
       <FmtBtn
+        compact={compact}
         active={editor.isActive('bold')}
         onClick={() => editor.chain().focus().toggleBold().run()}
         label="B"
         className="font-bold"
       />
       <FmtBtn
+        compact={compact}
         active={editor.isActive('italic')}
         onClick={() => editor.chain().focus().toggleItalic().run()}
         label="I"
         className="italic"
       />
       <FmtBtn
+        compact={compact}
         active={editor.isActive('underline')}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
         label="U"
         className="underline"
       />
-      <div className="w-px h-7 bg-[#d9ceb8]/60 shrink-0 max-sm:hidden" aria-hidden />
+      <div
+        className={`w-px shrink-0 bg-[#d9ceb8]/60 ${compact ? 'h-6 self-center' : 'h-7 max-sm:hidden'}`}
+        aria-hidden
+      />
       <FmtBtn
+        compact={compact}
         active={editor.isActive('bulletList')}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         label="•"
         className=""
       />
       <FmtBtn
+        compact={compact}
         active={editor.isActive('blockquote')}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         label="❝"
@@ -728,12 +931,8 @@ function FormatBubble({ editor }: { editor: ReturnType<typeof useEditor> }) {
   );
 }
 
-/**
- * Full-width bar inside BookView flow. Sticky within the app main scroll so it stays visible when the
- * page is scrolled; not `fixed` to the window (which stayed at the top while the book moved away).
- * Shown whenever there is a non-empty selection (scroll/touch often drops focus; selection can remain).
- */
-function FormatKeyboardDock({ editor }: { editor: Editor }) {
+/** Floated over the header strip (mobile); does not affect layout or push editor content. */
+function MobileHeaderFormatOverlay({ editor }: { editor: Editor }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -758,12 +957,16 @@ function FormatKeyboardDock({ editor }: { editor: Editor }) {
 
   return (
     <div
-      className="sticky z-[100] flex w-full items-center justify-evenly gap-1 px-2 py-2 border border-[#d9ceb8] rounded-lg bg-[#f5f0e1] shadow-md shadow-black/15 shrink-0 mb-2"
-      style={{ top: 'max(0px, env(safe-area-inset-top))' }}
-      role="toolbar"
-      aria-label="Text formatting"
+      className="pointer-events-none absolute inset-x-0 top-1/2 z-20 flex -translate-y-1/2 justify-center px-2"
+      role="presentation"
     >
-      <FormatToolbarInner editor={editor} />
+      <div
+        className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-[#d9ceb8] bg-[#f5f0e1] px-1 py-0.5 shadow-lg shadow-black/15"
+        role="toolbar"
+        aria-label="Text formatting"
+      >
+        <FormatToolbarInner editor={editor} compact />
+      </div>
     </div>
   );
 }
@@ -775,14 +978,30 @@ function FormatToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   return <FormatBubble editor={editor} />;
 }
 
-function FmtBtn({ active, onClick, label, className }: { active: boolean; onClick: () => void; label: string; className?: string }) {
+function FmtBtn({
+  active,
+  onClick,
+  label,
+  className,
+  compact,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  className?: string;
+  compact?: boolean;
+}) {
+  const size =
+    compact === true
+      ? 'inline-flex min-w-[40px] min-h-10 flex-none text-sm px-0.5'
+      : 'min-w-[44px] min-h-[44px] sm:min-w-8 sm:min-h-8 flex flex-1 sm:flex-none text-base sm:text-sm';
   return (
     <button
       type="button"
       onPointerDown={(e) => e.preventDefault()}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className={`min-w-[44px] min-h-[44px] sm:min-w-8 sm:min-h-8 flex flex-1 sm:flex-none items-center justify-center rounded-md text-base sm:text-sm transition-colors touch-manipulation ${
+      className={`${size} items-center justify-center rounded-md transition-colors touch-manipulation ${
         active ? 'bg-[#8b4513]/15 text-[#8b4513]' : 'text-[#3b3225] active:bg-[#8b4513]/10'
       } ${className ?? ''}`}
     >
