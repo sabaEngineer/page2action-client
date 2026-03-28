@@ -3,6 +3,12 @@ import type { Editor } from '@tiptap/core';
 import { useAuth } from '../context/auth';
 import { useImmersiveFullscreenOptional } from '../context/immersive-fullscreen-context';
 import { apiFetch } from '../lib/api';
+import {
+  INSIGHT_BODY_TEXT_CLASS,
+  INSIGHT_PAPER_BOX_SHADOW,
+  insightPaper as paper,
+} from '../lib/insightPaperTheme';
+import { publicInsightShareUrl } from '../lib/shareUrl';
 import type { Book, Insight, InsightStyle } from '../lib/types';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
@@ -32,19 +38,7 @@ const STYLE_LABELS: Record<string, { label: string; emoji: string }> = {
   APPLY_TODAY: { label: 'Apply This Today', emoji: '🎯' },
   DO_IT_NOW: { label: 'Do it now', emoji: '⚡' },
   SPREAD_THE_IDEA: { label: 'Spread the Idea', emoji: '💡' },
-};
-
-/* warm parchment palette */
-const paper = {
-  bg: 'bg-[#f5f0e1]',
-  bgGrad: 'from-[#f5f0e1] to-[#ebe5d3]',
-  text: 'text-[#3b3225]',
-  textMuted: 'text-[#8a7e6b]',
-  textLight: 'text-[#b0a48d]',
-  border: 'border-[#d9ceb8]',
-  line: '#d9ceb8',
-  accent: 'text-[#8b4513]',
-  accentBg: 'bg-[#8b4513]',
+  TODAYS_TAKEAWAY: { label: "Today's takeaway", emoji: '📌' },
 };
 
 export default function InsightsPage() {
@@ -127,6 +121,9 @@ export default function InsightsPage() {
         onInsightCreated={(ins) => setInsights((prev) => [...prev, ins])}
         onInsightDeleted={(id) => setInsights((prev) => prev.filter((i) => i.id !== id))}
         onInsightUpdated={(id, content) => setInsights((prev) => prev.map((i) => i.id === id ? { ...i, content } : i))}
+        onInsightShareUpdated={(updated) =>
+          setInsights((prev) => prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)))
+        }
       />
     </section>
   );
@@ -330,7 +327,7 @@ function useMobileSelectionScrollIntoView(
    Book view — parchment paper with old-style feel
    ═══════════════════════════════════════════════════════ */
 
-function BookView({ book, books, insights, token, onBookChange, onInsightCreated, onInsightDeleted, onInsightUpdated }: {
+function BookView({ book, books, insights, token, onBookChange, onInsightCreated, onInsightDeleted, onInsightUpdated, onInsightShareUpdated }: {
   book: Book;
   books: Book[];
   insights: Insight[];
@@ -339,6 +336,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
   onInsightCreated: (insight: Insight) => void;
   onInsightDeleted: (id: string) => void;
   onInsightUpdated: (id: string, content: string) => void;
+  onInsightShareUpdated: (insight: Insight) => void;
 }) {
   const narrow = useIsNarrowScreen();
   const [mobileEditor, setMobileEditor] = useState<Editor | null>(null);
@@ -376,6 +374,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
         onStyleChanged={(s) => {
           currentInsight.style = s;
         }}
+        onShareUpdated={onInsightShareUpdated}
         onDelete={() => {
           onInsightDeleted(currentInsight.id);
           setPage((p) => Math.max(0, p - 1));
@@ -462,7 +461,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
             : 'min-h-0 flex-1 mx-0 rounded-sm'
         }`}
         style={{
-          boxShadow: '4px 4px 20px rgba(0,0,0,0.5), inset 0 0 60px rgba(139,69,19,0.04)',
+          boxShadow: INSIGHT_PAPER_BOX_SHADOW,
         }}
       >
         {/* Page edge shadow (right side) */}
@@ -766,6 +765,7 @@ function PageMenu({
   insight,
   token,
   onStyleChanged,
+  onShareUpdated,
   onDelete,
   onAiEdit,
   aiBusy,
@@ -773,6 +773,7 @@ function PageMenu({
   insight: Insight;
   token: string;
   onStyleChanged: (style: InsightStyle | null) => void;
+  onShareUpdated: (insight: Insight) => void;
   onDelete: () => void;
   onAiEdit: (action: string) => void;
   aiBusy: boolean;
@@ -780,12 +781,17 @@ function PageMenu({
   const [open, setOpen] = useState(false);
   const [submenu, setSubmenu] = useState<'ai' | 'style' | null>(null);
   const [copied, setCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [localStyle, setLocalStyle] = useState<InsightStyle | null>(insight.style);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLocalStyle(insight.style);
   }, [insight.id, insight.style]);
+
+  useEffect(() => {
+    setShareCopied(false);
+  }, [insight.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -813,6 +819,39 @@ function PageMenu({
     navigator.clipboard.writeText(tmp.textContent ?? insight.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleSharePage() {
+    try {
+      const res = await apiFetch<Insight>(`/insights/${insight.id}/share`, token, { method: 'POST' });
+      if (res) onShareUpdated(res);
+      if (res?.sharePath) {
+        const url = publicInsightShareUrl(window.location.origin, res.sharePath);
+        await navigator.clipboard.writeText(url);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function handleCopyShareLink() {
+    if (!insight.sharePath) return;
+    const url = publicInsightShareUrl(window.location.origin, insight.sharePath);
+    await navigator.clipboard.writeText(url);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  }
+
+  async function handleStopSharing() {
+    try {
+      const res = await apiFetch<Insight>(`/insights/${insight.id}/share`, token, { method: 'DELETE' });
+      if (res) onShareUpdated(res);
+    } catch {
+      /* ignore */
+    }
+    setOpen(false);
   }
 
   function handleStyleChange(style: InsightStyle | null) {
@@ -878,6 +917,42 @@ function PageMenu({
                 </svg>
                 <span>{copied ? 'Copied!' : 'Copy text'}</span>
               </button>
+
+              {!insight.isShared ? (
+                <button
+                  type="button"
+                  onClick={() => void handleSharePage()}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-[#3b3225] hover:bg-[#8b4513]/5 transition-colors"
+                >
+                  <svg className="w-4 h-4 text-[#8a7e6b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0-11.162l9.566-5.314m-9.566 11.162l9.566-5.314" />
+                  </svg>
+                  <span>{shareCopied ? 'Link copied!' : 'Share this page'}</span>
+                </button>
+              ) : (
+                <>
+                  {insight.sharePath ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyShareLink()}
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-[#3b3225] hover:bg-[#8b4513]/5 transition-colors"
+                    >
+                      <svg className="w-4 h-4 text-[#8a7e6b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-1.036a4.5 4.5 0 0 1-1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757" />
+                      </svg>
+                      <span>{shareCopied ? 'Copied!' : 'Copy share link'}</span>
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void handleStopSharing()}
+                    className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-[#6b5d4d] hover:bg-[#8b4513]/5 transition-colors"
+                  >
+                    <span className="w-4 text-center text-xs">🔒</span>
+                    <span>Stop sharing</span>
+                  </button>
+                </>
+              )}
 
               <div className="my-1 h-px bg-[#d9ceb8]/60" />
 
@@ -1179,10 +1254,6 @@ const TIPTAP_EXTENSIONS = [
   InsightHorizontalRule,
 ];
 
-/** 16px+ on small screens stops iOS Safari from zooming the viewport when the editor is focused. */
-const EDITOR_TEXT_CLASS =
-  'flex-1 w-full bg-transparent outline-none text-[16px] leading-[26px] min-h-[400px] max-w-none sm:text-[15px]';
-
 /* ── New blank page ── */
 
 function NewPage({ bookId, token, onCreated, onEditorReady }: {
@@ -1202,7 +1273,7 @@ function NewPage({ bookId, token, onCreated, onEditorReady }: {
     ],
     editorProps: {
       attributes: {
-        class: `${EDITOR_TEXT_CLASS} ${paper.text}`,
+        class: `${INSIGHT_BODY_TEXT_CLASS} ${paper.text}`,
         style: 'font-family: Georgia, serif',
       },
     },
@@ -1279,7 +1350,7 @@ function PageContent({ insight, token, aiLoading, aiPreview, onEditorReady, onAc
     content: insight.content,
     editorProps: {
       attributes: {
-        class: `${EDITOR_TEXT_CLASS} ${paper.text}`,
+        class: `${INSIGHT_BODY_TEXT_CLASS} ${paper.text}`,
         style: 'font-family: Georgia, serif',
       },
     },

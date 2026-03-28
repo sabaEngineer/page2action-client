@@ -53,3 +53,13 @@ export function publicBookshelfShareUrl(
   const base = origin.replace(/\/$/, '');
   return `${base}/bookshelf/${who}/${shareSlug}`;
 }
+
+/** Single shared insight page: `/insight/:ownerSlug/:bookSlug/:page` */
+export function publicInsightShareUrl(
+  origin: string,
+  path: { ownerSlug: string; bookSlug: string; page: number },
+): string {
+  const base = origin.replace(/\/$/, '');
+  const { ownerSlug, bookSlug, page } = path;
+  return `${base}/insight/${encodeURIComponent(ownerSlug)}/${encodeURIComponent(bookSlug)}/${page}`;
+}

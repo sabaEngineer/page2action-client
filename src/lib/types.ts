@@ -4,6 +4,8 @@ export type Book = {
   author: string | null;
   shelfId: string | null;
   userId: string;
+  /** Set when the user shares an insight from this book (public URL segment). */
+  publicSlug?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -55,6 +57,12 @@ export type InsightStyle =
   | 'SPREAD_THE_IDEA'
   | 'TODAYS_TAKEAWAY';
 
+export type InsightSharePath = {
+  ownerSlug: string;
+  bookSlug: string;
+  page: number;
+};
+
 export type Insight = {
   id: string;
   content: string;
@@ -62,8 +70,25 @@ export type Insight = {
   bookId: string;
   userId: string;
   position: number;
+  isShared?: boolean;
+  shareSlug?: string | null;
+  /** Present when this page is shared and slugs exist (for copy link). */
+  sharePath?: InsightSharePath | null;
   details: InsightDetail[];
-  book?: { id: string; title: string; author: string | null };
+  book?: { id: string; title: string; author: string | null; publicSlug?: string | null };
   createdAt: string;
   updatedAt: string;
+};
+
+/** Public GET /insights/public/page/… (read-only). */
+export type PublicSharedInsight = {
+  content: string;
+  style: InsightStyle | null;
+  details: { content: string; type: DetailType }[];
+  bookTitle: string;
+  bookAuthor: string | null;
+  authorName: string | null;
+  page: number;
+  /** Footer denominator: insight count + 1 (“new page” slot), same as authenticated book view. */
+  totalPages: number;
 };

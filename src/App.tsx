@@ -7,12 +7,16 @@ import ShelfDetailPage from './pages/ShelfDetailPage';
 import InsightsPage from './pages/InsightsPage';
 import PublicShelfPage from './pages/PublicShelfPage';
 import PublicBookshelfPage from './pages/PublicBookshelfPage';
+import PublicInsightPage from './pages/PublicInsightPage';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+
+      {/* Public shared insight (single book “page”, read-only) */}
+      <Route path="/insight/:owner/:book/:page" element={<PublicInsightPage />} />
 
       {/* Public share pages (no auth); name segment is cosmetic, slug is the secret token */}
       <Route path="/s/:who/:slug" element={<PublicShelfPage />} />
