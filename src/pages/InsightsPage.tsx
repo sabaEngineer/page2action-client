@@ -265,15 +265,17 @@ function usePaperKeyboardPadding(enabled: boolean) {
     if (!vv) return;
     const update = () => {
       const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      setPadPx(inset);
+      // Ignore sub-pixel / tiny changes to avoid re-renders while typing (iOS fires
+      // visualViewport updates often; state churn shifts layout and can drop the keyboard).
+      setPadPx((prev) => (Math.abs(prev - inset) < 8 ? prev : inset));
     };
     update();
     vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
+    // Do NOT listen to visualViewport 'scroll' — iOS emits it frequently during typing
+    // and causes padding + scroll jumps without helping the keyboard.
     window.addEventListener('resize', update);
     return () => {
       vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
     };
   }, [enabled]);
@@ -328,13 +330,12 @@ function useMobileSelectionScrollIntoView(
     editor.on('selectionUpdate', nudge);
     editor.on('focus', nudge);
     vv.addEventListener('resize', nudge);
-    vv.addEventListener('scroll', nudge);
+    // Avoid visualViewport 'scroll' here — same iOS churn as keyboard padding hook.
 
     return () => {
       editor.off('selectionUpdate', nudge);
       editor.off('focus', nudge);
       vv.removeEventListener('resize', nudge);
-      vv.removeEventListener('scroll', nudge);
     };
   }, [editor, enabled, scrollRootRef]);
 }
@@ -558,7 +559,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
               ref={contentScrollRef}
               className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
               style={{
-                scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
+                scrollPaddingBottom: undefined,
               }}
             >
               <div
@@ -688,7 +689,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
               ref={contentScrollRef}
               className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
               style={{
-                scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
+                scrollPaddingBottom: undefined,
               }}
             >
               <div
@@ -1257,6 +1258,13 @@ const TIPTAP_EXTENSIONS = [
   InsightHorizontalRule,
 ];
 
+/** ProseMirror scroll-into-view fights our inner scroll + iOS keyboard; skip on phone. */
+function mobileEditorScrollProps(): { handleScrollToSelection?: () => boolean } {
+  if (typeof window === 'undefined') return {};
+  if (!window.matchMedia('(max-width: 639px)').matches) return {};
+  return { handleScrollToSelection: () => true };
+}
+
 /* ── New blank page ── */
 
 function NewPage({ bookId, token, onCreated, onEditorReady }: {
@@ -1279,6 +1287,7 @@ function NewPage({ bookId, token, onCreated, onEditorReady }: {
         class: `${INSIGHT_BODY_TEXT_CLASS} ${paper.text}`,
         style: 'font-family: Georgia, serif',
       },
+      ...mobileEditorScrollProps(),
     },
     autofocus: typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches,
     onUpdate: ({ editor: ed }) => {
@@ -1356,6 +1365,7 @@ function PageContent({ insight, token, aiLoading, aiPreview, onEditorReady, onAc
         class: `${INSIGHT_BODY_TEXT_CLASS} ${paper.text}`,
         style: 'font-family: Georgia, serif',
       },
+      ...mobileEditorScrollProps(),
     },
     onUpdate: ({ editor: ed }) => {
       const html = ed.getHTML();
