@@ -486,7 +486,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
         </div>
 
         {fullscreen ? (
-          /* Fullscreen: one scroll column so page header + footer can stick while body scrolls */
+          /* Sticky top header + scroll body + sticky bottom Prev/Next */
           <div
             ref={contentScrollRef}
             className="flex min-h-0 flex-1 flex-col overflow-y-auto hide-scrollbar"
@@ -494,53 +494,55 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
               scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
             }}
           >
-            <div
-              className={`sticky top-0 z-20 shrink-0 border-b ${paper.border} ${paper.bg} px-4 pt-5 pb-3 sm:px-8 flex min-w-0 ${
-                narrow ? 'items-center justify-between gap-2' : 'items-center gap-3'
-              }`}
-            >
-              {narrow ? (
-                <>
-                  <span
-                    className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
-                    style={{ fontFamily: 'Georgia, serif' }}
-                  >
-                    {isNewPage ? 'New Page' : `Page ${page + 1}`}
-                  </span>
-                  <div
-                    className={`flex min-w-0 flex-1 items-center justify-end gap-2 ${
-                      immersiveMobile
-                        ? 'pr-[max(2.75rem,calc(env(safe-area-inset-right)+2.25rem))]'
-                        : ''
-                    }`}
-                  >
+            <div className={`sticky top-0 z-20 shrink-0 ${paper.bg} shadow-[0_4px_12px_rgba(0,0,0,0.06)]`}>
+              <div
+                className={`relative flex min-w-0 border-b ${paper.border} px-4 pt-5 pb-3 sm:px-8 ${
+                  narrow ? 'items-center justify-between gap-2' : 'items-center gap-3'
+                }`}
+              >
+                {narrow ? (
+                  <>
                     <span
-                      className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-right`}
+                      className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
+                      style={{ fontFamily: 'Georgia, serif' }}
+                    >
+                      {isNewPage ? 'New Page' : `Page ${page + 1}`}
+                    </span>
+                    <div
+                      className={`flex min-w-0 flex-1 items-center justify-end gap-2 ${
+                        immersiveMobile
+                          ? 'pr-[max(2.75rem,calc(env(safe-area-inset-right)+2.25rem))]'
+                          : ''
+                      }`}
+                    >
+                      <span
+                        className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-right`}
+                        style={{ fontFamily: 'Georgia, serif' }}
+                      >
+                        {book.title}
+                      </span>
+                      <span className="shrink-0">{insightPageMenu}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
+                      style={{ fontFamily: 'Georgia, serif' }}
+                    >
+                      {isNewPage ? 'New Page' : `Page ${page + 1}`}
+                    </span>
+                    {insightPageMenu}
+                    <span
+                      className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-left`}
                       style={{ fontFamily: 'Georgia, serif' }}
                     >
                       {book.title}
                     </span>
-                    <span className="shrink-0">{insightPageMenu}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span
-                    className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
-                    style={{ fontFamily: 'Georgia, serif' }}
-                  >
-                    {isNewPage ? 'New Page' : `Page ${page + 1}`}
-                  </span>
-                  {insightPageMenu}
-                  <span
-                    className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-left`}
-                    style={{ fontFamily: 'Georgia, serif' }}
-                  >
-                    {book.title}
-                  </span>
-                </>
-              )}
-              {narrow && mobileEditor ? <MobileHeaderFormatOverlay editor={mobileEditor} /> : null}
+                  </>
+                )}
+                {narrow && mobileEditor ? <MobileHeaderFormatOverlay editor={mobileEditor} /> : null}
+              </div>
             </div>
 
             <div
@@ -583,29 +585,28 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
             </div>
 
             <div
-              className={`sticky bottom-0 z-20 flex shrink-0 items-center justify-between border-t ${paper.border} ${paper.bg} px-6 py-3`}
+              className={`sticky bottom-0 z-20 flex shrink-0 items-center justify-between border-t ${paper.border} ${paper.bg} px-6 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]`}
+              style={{ fontFamily: 'Georgia, serif' }}
             >
               <button
+                type="button"
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0 || aiPageLoading !== null || aiPreview !== null}
                 className="flex items-center gap-1.5 rounded-lg bg-[#8b4513]/10 px-4 py-2 text-sm font-semibold text-[#8b4513] transition-all hover:bg-[#8b4513]/20 active:scale-95 disabled:opacity-0"
-                style={{ fontFamily: 'Georgia, serif' }}
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
                 Prev
               </button>
-
-              <span className={`text-sm font-medium ${paper.textMuted}`} style={{ fontFamily: 'Georgia, serif' }}>
+              <span className={`text-sm font-medium ${paper.textMuted}`}>
                 {page + 1} / {totalPages}
               </span>
-
               <button
+                type="button"
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page === totalPages - 1 || aiPageLoading !== null || aiPreview !== null}
                 className="flex items-center gap-1.5 rounded-lg bg-[#8b4513]/10 px-4 py-2 text-sm font-semibold text-[#8b4513] transition-all hover:bg-[#8b4513]/20 active:scale-95 disabled:opacity-0"
-                style={{ fontFamily: 'Georgia, serif' }}
               >
                 Next
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -615,66 +616,71 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
             </div>
           </div>
         ) : (
-          <>
-            {/* Top decoration — mobile: format toolbar is absolute (overlay) */}
-            <div
-              className={`relative flex min-w-0 border-b ${paper.border} px-4 pt-5 pb-3 sm:px-8 ${
-                narrow ? 'items-center justify-between gap-2' : 'items-center justify-between'
-              }`}
-            >
-              {narrow ? (
-                <>
-                  <span
-                    className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
-                    style={{ fontFamily: 'Georgia, serif' }}
-                  >
-                    {isNewPage ? 'New Page' : `Page ${page + 1}`}
-                  </span>
-                  <div
-                    className={`flex min-w-0 flex-1 items-center justify-end gap-2 ${
-                      immersiveMobile
-                        ? 'pr-[max(2.75rem,calc(env(safe-area-inset-right)+2.25rem))]'
-                        : ''
-                    }`}
-                  >
+          <div
+            ref={contentScrollRef}
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto hide-scrollbar"
+            style={{
+              scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
+            }}
+          >
+            <div className={`sticky top-0 z-20 shrink-0 ${paper.bg} shadow-[0_4px_12px_rgba(0,0,0,0.06)]`}>
+              <div
+                className={`relative flex min-w-0 border-b ${paper.border} px-4 pt-5 pb-3 sm:px-8 ${
+                  narrow ? 'items-center justify-between gap-2' : 'items-center justify-between'
+                }`}
+              >
+                {narrow ? (
+                  <>
                     <span
-                      className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-right`}
+                      className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
                       style={{ fontFamily: 'Georgia, serif' }}
                     >
-                      {book.title}
+                      {isNewPage ? 'New Page' : `Page ${page + 1}`}
                     </span>
-                    <span className="shrink-0">{insightPageMenu}</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <span
-                    className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
-                    style={{ fontFamily: 'Georgia, serif' }}
-                  >
-                    {isNewPage ? 'New Page' : `Page ${page + 1}`}
-                  </span>
-                  <div className="flex max-w-[55%] min-w-0 shrink-0 items-center gap-2 sm:max-w-none">
-                    <span className={`text-[10px] ${paper.textLight} truncate`} style={{ fontFamily: 'Georgia, serif' }}>
-                      {book.title}
+                    <div
+                      className={`flex min-w-0 flex-1 items-center justify-end gap-2 ${
+                        immersiveMobile
+                          ? 'pr-[max(2.75rem,calc(env(safe-area-inset-right)+2.25rem))]'
+                          : ''
+                      }`}
+                    >
+                      <span
+                        className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-right`}
+                        style={{ fontFamily: 'Georgia, serif' }}
+                      >
+                        {book.title}
+                      </span>
+                      <span className="shrink-0">{insightPageMenu}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
+                      style={{ fontFamily: 'Georgia, serif' }}
+                    >
+                      {isNewPage ? 'New Page' : `Page ${page + 1}`}
                     </span>
-                    {insightPageMenu}
-                  </div>
-                </>
-              )}
-              {narrow && mobileEditor ? <MobileHeaderFormatOverlay editor={mobileEditor} /> : null}
+                    <div className="flex max-w-[55%] min-w-0 shrink-0 items-center gap-2 sm:max-w-none">
+                      <span className={`text-[10px] ${paper.textLight} truncate`} style={{ fontFamily: 'Georgia, serif' }}>
+                        {book.title}
+                      </span>
+                      {insightPageMenu}
+                    </div>
+                  </>
+                )}
+                {narrow && mobileEditor ? <MobileHeaderFormatOverlay editor={mobileEditor} /> : null}
+              </div>
             </div>
 
             <div
-              ref={contentScrollRef}
-              className="relative flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:pl-16 hide-scrollbar"
+              className="relative px-4 py-6 sm:px-8 sm:pl-16"
               style={{
                 fontFamily: 'Georgia, serif',
                 paddingBottom:
                   narrow && keyboardPadPx > 0
                     ? `${Math.min(keyboardPadPx + 64, 400)}px`
                     : undefined,
-                scrollPaddingBottom: narrow ? 'min(45vh, 280px)' : undefined,
               }}
             >
               {isNewPage ? (
@@ -706,28 +712,29 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
               ) : null}
             </div>
 
-            <div className={`relative flex items-center justify-between border-t ${paper.border} px-6 py-3`}>
+            <div
+              className={`sticky bottom-0 z-20 flex shrink-0 items-center justify-between border-t ${paper.border} ${paper.bg} px-6 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]`}
+              style={{ fontFamily: 'Georgia, serif' }}
+            >
               <button
+                type="button"
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0 || aiPageLoading !== null || aiPreview !== null}
                 className="flex items-center gap-1.5 rounded-lg bg-[#8b4513]/10 px-4 py-2 text-sm font-semibold text-[#8b4513] transition-all hover:bg-[#8b4513]/20 active:scale-95 disabled:opacity-0"
-                style={{ fontFamily: 'Georgia, serif' }}
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                 </svg>
                 Prev
               </button>
-
-              <span className={`text-sm font-medium ${paper.textMuted}`} style={{ fontFamily: 'Georgia, serif' }}>
+              <span className={`text-sm font-medium ${paper.textMuted}`}>
                 {page + 1} / {totalPages}
               </span>
-
               <button
+                type="button"
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page === totalPages - 1 || aiPageLoading !== null || aiPreview !== null}
                 className="flex items-center gap-1.5 rounded-lg bg-[#8b4513]/10 px-4 py-2 text-sm font-semibold text-[#8b4513] transition-all hover:bg-[#8b4513]/20 active:scale-95 disabled:opacity-0"
-                style={{ fontFamily: 'Georgia, serif' }}
               >
                 Next
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -735,7 +742,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                 </svg>
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
