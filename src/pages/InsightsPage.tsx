@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Editor } from '@tiptap/core';
+import {
+  InsightReadingSkeleton,
+  InsightTopChromeSkeleton,
+} from '../components/InsightReadingSkeleton';
 import { useAuth } from '../context/auth';
 import { useImmersiveFullscreenOptional } from '../context/immersive-fullscreen-context';
+import { useIsNarrowScreen } from '../hooks/useIsNarrowScreen';
 import { apiFetch } from '../lib/api';
 import {
   INSIGHT_BODY_TEXT_CLASS,
@@ -44,6 +49,7 @@ const STYLE_LABELS: Record<string, { label: string; emoji: string }> = {
 export default function InsightsPage() {
   const { token } = useAuth();
   const immersive = useImmersiveFullscreenOptional()?.immersive ?? false;
+  const narrow = useIsNarrowScreen();
   const [insights, setInsights] = useState<Insight[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,9 +85,19 @@ export default function InsightsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-indigo-400" />
-      </div>
+      <section
+        className={`text-left min-h-0 ${
+          immersive ? 'flex h-full min-h-0 flex-col' : 'flex flex-1 flex-col overflow-hidden'
+        }`}
+        aria-busy="true"
+        aria-label="Loading insights"
+      >
+        <span className="sr-only">Loading…</span>
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-1 flex-col">
+          <InsightTopChromeSkeleton pickerStyle />
+          <InsightReadingSkeleton narrow={narrow} />
+        </div>
+      </section>
     );
   }
 
@@ -1061,19 +1077,6 @@ function PageMenu({
 }
 
 /* ── Formatting: bubble (desktop) + absolute overlay on paper header (mobile, when selection) ── */
-
-function useIsNarrowScreen() {
-  const [narrow, setNarrow] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const onChange = () => setNarrow(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return narrow;
-}
 
 function FormatToolbarInner({ editor, compact }: { editor: Editor; compact?: boolean }) {
   return (

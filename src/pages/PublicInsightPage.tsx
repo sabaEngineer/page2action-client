@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import {
+  InsightReadingSkeleton,
+  InsightTopChromeSkeleton,
+} from '../components/InsightReadingSkeleton';
+import { useIsNarrowScreen } from '../hooks/useIsNarrowScreen';
 import { apiFetch } from '../lib/api';
 import {
   INSIGHT_BODY_TEXT_CLASS,
@@ -7,19 +12,6 @@ import {
   insightPaper as paper,
 } from '../lib/insightPaperTheme';
 import type { PublicSharedInsight } from '../lib/types';
-
-function useIsNarrowScreen() {
-  const [narrow, setNarrow] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(max-width: 639px)').matches : false,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 639px)');
-    const onChange = () => setNarrow(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return narrow;
-}
 
 export default function PublicInsightPage() {
   const narrow = useIsNarrowScreen();
@@ -58,17 +50,6 @@ export default function PublicInsightPage() {
     );
   }
 
-  if (!data) {
-    return (
-      <div className="h-dvh max-h-dvh bg-gray-950 text-gray-100 flex items-center justify-center">
-        <p className="text-sm text-gray-500">Loading…</p>
-      </div>
-    );
-  }
-
-  const pageLabel = data.page;
-  const totalPages = data.totalPages;
-
   const wrapperClass = fullscreen
     ? immersiveMobile
       ? 'fixed inset-0 z-[100] flex flex-col min-h-0 w-full h-[100dvh] max-h-[100dvh] relative bg-[#f5f0e1] pb-[env(safe-area-inset-bottom)]'
@@ -88,6 +69,27 @@ export default function PublicInsightPage() {
     : `relative flex min-w-0 border-b ${paper.border} px-4 pt-5 pb-3 sm:px-8 ${
         narrow ? 'items-center justify-between gap-2' : 'items-center justify-between'
       }`;
+
+  if (!data) {
+    return (
+      <div
+        className="min-h-0 h-dvh max-h-dvh bg-gray-950 text-gray-100 flex flex-col overflow-hidden"
+        aria-busy="true"
+        aria-label="Loading shared page"
+      >
+        <span className="sr-only">Loading…</span>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-0 pt-3 sm:px-6 sm:pt-4">
+          <div className={`${wrapperClass} h-full min-h-0`}>
+            <InsightTopChromeSkeleton />
+            <InsightReadingSkeleton narrow={narrow} paperClassName="flex-1 mx-0 min-h-0 rounded-sm" />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const pageLabel = data.page;
+  const totalPages = data.totalPages;
 
   const paperBody = (
     <>
