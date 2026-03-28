@@ -91,10 +91,11 @@ export default function BooksSection() {
   return (
     <section className="text-left">
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-semibold text-white">Bookshelf</h2>
-          {bookshelfShareUrl && (
+      <div
+        className={`flex flex-wrap items-start gap-3 ${bookshelfShareUrl ? 'justify-between' : 'justify-end'}`}
+      >
+        {bookshelfShareUrl ? (
+          <div className="min-w-0 flex-1">
             <ShareLinkCopyButton
               url={bookshelfShareUrl}
               kind="bookshelf"
@@ -102,8 +103,8 @@ export default function BooksSection() {
               email={user?.email}
               prefixText="Your bookshelf is public -"
             />
-          )}
-        </div>
+          </div>
+        ) : null}
         <div className="relative shrink-0" ref={menuRef}>
           <button
             type="button"

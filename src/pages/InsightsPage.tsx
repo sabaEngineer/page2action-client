@@ -94,7 +94,6 @@ export default function InsightsPage() {
   if (books.length === 0) {
     return (
       <section className="text-left">
-        <h2 className="text-xl font-semibold text-white mb-4">Insights</h2>
         <p className="text-gray-500">Add some books first, then save insights from them.</p>
       </section>
     );
@@ -104,7 +103,6 @@ export default function InsightsPage() {
   if (!book || !activeBookId) {
     return (
       <section className="text-left">
-        <h2 className="text-xl font-semibold text-white mb-4">Insights</h2>
         <p className="text-gray-500">No book selected.</p>
       </section>
     );
@@ -120,7 +118,6 @@ export default function InsightsPage() {
         immersive ? 'flex h-full min-h-0 flex-col' : 'flex flex-1 flex-col overflow-hidden'
       }`}
     >
-      {!immersive ? <h2 className="text-xl font-semibold text-white mb-4">Insights</h2> : null}
       <BookView
         book={book}
         books={booksSorted}
