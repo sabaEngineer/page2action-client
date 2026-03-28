@@ -49,7 +49,7 @@ export default function PublicInsightPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center px-6">
+      <div className="h-dvh max-h-dvh bg-gray-950 text-gray-100 flex flex-col items-center justify-center px-6">
         <p className="text-gray-400">{error}</p>
         <Link to="/" className="mt-4 text-indigo-400 hover:text-indigo-300 text-sm">
           Page2Action
@@ -60,7 +60,7 @@ export default function PublicInsightPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex items-center justify-center">
+      <div className="h-dvh max-h-dvh bg-gray-950 text-gray-100 flex items-center justify-center">
         <p className="text-sm text-gray-500">Loading…</p>
       </div>
     );
@@ -80,7 +80,7 @@ export default function PublicInsightPage() {
       ? immersiveMobile
         ? 'flex-1 m-0 w-full min-h-0 rounded-none'
         : 'flex-1 mx-4 mb-4 rounded-sm'
-      : 'flex-1 mx-0 rounded-sm'
+      : 'flex-1 mx-0 min-h-0 rounded-sm'
   }`;
 
   const headerRowClass = fullscreen && !narrow
@@ -209,13 +209,13 @@ export default function PublicInsightPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col overflow-hidden h-dvh max-h-dvh">
+    <div className="min-h-0 h-dvh max-h-dvh bg-gray-950 text-gray-100 flex flex-col overflow-hidden">
       <main
-        className={`flex-1 flex flex-col min-h-0 ${
-          fullscreen ? 'overflow-hidden p-0' : 'overflow-hidden px-6 py-8 pb-24 lg:pb-8'
+        className={`flex min-h-0 flex-1 flex-col ${
+          fullscreen ? 'overflow-hidden p-0' : 'overflow-hidden px-4 pb-0 pt-3 sm:px-6 sm:pt-4'
         }`}
       >
-        <div className={wrapperClass}>
+        <div className={`${wrapperClass} h-full min-h-0`}>
           {immersiveMobile ? (
             <button
               type="button"
@@ -261,14 +261,6 @@ export default function PublicInsightPage() {
           <div className={paperShellClass} style={{ boxShadow: INSIGHT_PAPER_BOX_SHADOW }}>
             {paperBody}
           </div>
-
-          {!fullscreen ? (
-            <div className="mt-8 text-center shrink-0">
-              <Link to="/" className="text-sm text-indigo-400 hover:text-indigo-300">
-                Page2Action
-              </Link>
-            </div>
-          ) : null}
         </div>
       </main>
     </div>
