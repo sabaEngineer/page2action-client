@@ -116,7 +116,7 @@ export default function PublicInsightPage() {
                   className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
                   style={{ fontFamily: 'Georgia, serif' }}
                 >
-                  Page {pageLabel}
+                  Insight {pageLabel}
                 </span>
                 <span
                   className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-right ${
@@ -133,7 +133,7 @@ export default function PublicInsightPage() {
                   className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
                   style={{ fontFamily: 'Georgia, serif' }}
                 >
-                  Page {pageLabel}
+                  Insight {pageLabel}
                 </span>
                 <span
                   className={`text-[10px] ${paper.textLight} min-w-0 flex-1 truncate text-left`}
@@ -148,7 +148,7 @@ export default function PublicInsightPage() {
                   className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
                   style={{ fontFamily: 'Georgia, serif' }}
                 >
-                  Page {pageLabel}
+                  Insight {pageLabel}
                 </span>
                 <div className="flex max-w-[55%] min-w-0 shrink-0 items-center gap-2 sm:max-w-none">
                   <span
@@ -192,7 +192,7 @@ export default function PublicInsightPage() {
             Prev
           </button>
           <span className={`text-sm font-medium ${paper.textMuted}`}>
-            {pageLabel} / {totalPages}
+            Insight {pageLabel} / {totalPages}
           </span>
           <button
             type="button"

@@ -568,7 +568,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                       className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
                       style={{ fontFamily: 'Georgia, serif' }}
                     >
-                      {isNewPage ? 'New Page' : `Page ${page + 1}`}
+                      {isNewPage ? 'New Page' : `Insight ${page + 1}`}
                     </span>
                     <div
                       className={`flex min-w-0 flex-1 items-center justify-end gap-2 ${
@@ -592,7 +592,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                       className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
                       style={{ fontFamily: 'Georgia, serif' }}
                     >
-                      {isNewPage ? 'New Page' : `Page ${page + 1}`}
+                      {isNewPage ? 'New Page' : `Insight ${page + 1}`}
                     </span>
                     {insightPageMenu}
                     <span
@@ -672,7 +672,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                 Prev
               </button>
               <span className={`text-sm font-medium ${paper.textMuted}`}>
-                {page + 1} / {totalPages}
+                Insight {page + 1} / {totalPages}
               </span>
               <button
                 type="button"
@@ -701,7 +701,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                       className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
                       style={{ fontFamily: 'Georgia, serif' }}
                     >
-                      {isNewPage ? 'New Page' : `Page ${page + 1}`}
+                      {isNewPage ? 'New Page' : `Insight ${page + 1}`}
                     </span>
                     <div
                       className={`flex min-w-0 flex-1 items-center justify-end gap-2 ${
@@ -725,7 +725,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                       className={`text-[10px] uppercase tracking-[0.2em] ${paper.textMuted} shrink-0`}
                       style={{ fontFamily: 'Georgia, serif' }}
                     >
-                      {isNewPage ? 'New Page' : `Page ${page + 1}`}
+                      {isNewPage ? 'New Page' : `Insight ${page + 1}`}
                     </span>
                     <div className="flex max-w-[55%] min-w-0 shrink-0 items-center gap-2 sm:max-w-none">
                       <span className={`text-[10px] ${paper.textLight} truncate`} style={{ fontFamily: 'Georgia, serif' }}>
@@ -804,7 +804,7 @@ function BookView({ book, books, insights, token, onBookChange, onInsightCreated
                 Prev
               </button>
               <span className={`text-sm font-medium ${paper.textMuted}`}>
-                {page + 1} / {totalPages}
+                Insight {page + 1} / {totalPages}
               </span>
               <button
                 type="button"
@@ -1223,7 +1223,7 @@ function MobileHeaderFormatOverlay({ editor }: { editor: Editor }) {
       role="presentation"
     >
       <div
-        className="pointer-events-auto flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-[#d9ceb8] bg-[#f5f0e1] px-1 py-0.5 shadow-lg shadow-black/15"
+        className="pointer-events-auto flex max-w-full flex-nowrap items-center justify-center gap-0.5 overflow-x-auto rounded-lg border border-[#d9ceb8] bg-[#f5f0e1] px-1 py-0.5 shadow-lg shadow-black/15 hide-scrollbar"
         role="toolbar"
         aria-label="Text formatting"
       >
@@ -1255,14 +1255,19 @@ function FmtBtn({
 }) {
   const size =
     compact === true
-      ? 'inline-flex min-w-[40px] min-h-10 flex-none text-sm px-0.5'
+      ? 'inline-flex h-9 min-w-[34px] flex-none text-xs px-0.5'
       : 'min-w-[44px] min-h-[44px] sm:min-w-8 sm:min-h-8 flex flex-1 sm:flex-none text-base sm:text-sm';
+  function runAction(e: { preventDefault: () => void }) {
+    e.preventDefault();
+    onClick();
+  }
+
   return (
     <button
       type="button"
-      onPointerDown={(e) => e.preventDefault()}
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={onClick}
+      onPointerDown={runAction}
+      onMouseDown={runAction}
+      onClick={(e) => e.preventDefault()}
       className={`${size} items-center justify-center rounded-md transition-colors touch-manipulation ${
         active ? 'bg-[#8b4513]/15 text-[#8b4513]' : 'text-[#3b3225] active:bg-[#8b4513]/10'
       } ${className ?? ''}`}
