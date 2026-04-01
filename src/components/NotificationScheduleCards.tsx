@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '../lib/api';
 import { NOTIFICATION_STYLE_ORDER, NOTIFICATION_STYLE_UI } from '../lib/notificationStyles';
-import type { InsightStyle, NotificationScheduleRow, UserNotificationsResponse } from '../lib/types';
+import type {
+  InsightStyle,
+  NotificationScheduleRow,
+  SendNotificationNowResponse,
+  UserNotificationsResponse,
+} from '../lib/types';
 
 function toTimeValue(h: number, m: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -48,6 +53,8 @@ export default function NotificationScheduleCards({ token }: { token: string }) 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sendNowBusy, setSendNowBusy] = useState<InsightStyle | null>(null);
+  const [sendNowHint, setSendNowHint] = useState<Partial<Record<InsightStyle, string>>>({});
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const load = useCallback(async () => {
@@ -84,6 +91,37 @@ export default function NotificationScheduleCards({ token }: { token: string }) 
         if (res) setData(res);
       } catch (e) {
         setSaveError(e instanceof Error ? e.message : 'Could not save');
+      }
+    },
+    [token],
+  );
+
+  const sendNow = useCallback(
+    async (style: InsightStyle) => {
+      setSendNowBusy(style);
+      setSendNowHint((h) => ({ ...h, [style]: '' }));
+      try {
+        const res = await apiFetch<SendNotificationNowResponse>(
+          '/users/me/notifications/send-now',
+          token,
+          {
+            method: 'POST',
+            body: JSON.stringify({ style }),
+          },
+        );
+        if (res) {
+          setSendNowHint((h) => ({
+            ...h,
+            [style]: res.sent ? 'Sent.' : res.message,
+          }));
+        }
+      } catch (e) {
+        setSendNowHint((h) => ({
+          ...h,
+          [style]: e instanceof Error ? e.message : 'Could not send',
+        }));
+      } finally {
+        setSendNowBusy(null);
       }
     },
     [token],
@@ -160,7 +198,7 @@ export default function NotificationScheduleCards({ token }: { token: string }) 
           return (
             <div
               key={style}
-              className={`flex flex-col rounded-xl border border-gray-800/90 bg-gradient-to-b from-gray-900/50 to-gray-950/80 p-3 shadow-sm shadow-black/10 min-h-[7.75rem] ${
+              className={`flex flex-col rounded-xl border border-gray-800/90 bg-gradient-to-b from-gray-900/50 to-gray-950/80 p-3 shadow-sm shadow-black/10 min-h-[9.5rem] ${
                 row.enabled ? 'ring-1 ring-amber-900/25' : ''
               }`}
             >
@@ -170,7 +208,7 @@ export default function NotificationScheduleCards({ token }: { token: string }) 
                     {ui.emoji}
                   </span>
                   <h3 className="text-xs font-semibold text-white mt-1 leading-tight">{ui.label}</h3>
-                  <p className="text-[10px] text-gray-500 leading-snug mt-0.5 line-clamp-2">{ui.blurb}</p>
+                  <p className="text-[10px] text-gray-400 leading-snug mt-0.5 line-clamp-2">{ui.blurb}</p>
                 </div>
                 <ScheduleToggle
                   enabled={row.enabled}
@@ -188,7 +226,7 @@ export default function NotificationScheduleCards({ token }: { token: string }) 
                   }}
                 />
               </div>
-              <div className="mt-auto pt-1">
+              <div className="mt-auto pt-1 space-y-1.5">
                 <label className="block">
                   <span className="sr-only">Send time for {ui.label}</span>
                   <input
@@ -200,6 +238,23 @@ export default function NotificationScheduleCards({ token }: { token: string }) 
                     className="w-full rounded-md border border-gray-700/90 bg-gray-950/90 px-2 py-1.5 text-xs text-white tabular-nums focus:border-amber-800/50 focus:outline-none focus:ring-1 focus:ring-amber-600/25 disabled:opacity-35"
                   />
                 </label>
+                <button
+                  type="button"
+                  disabled={sendNowBusy === style}
+                  onClick={() => void sendNow(style)}
+                  className="self-start rounded-md border border-amber-700/60 bg-amber-900/40 px-2 py-1 text-xs leading-4 font-semibold text-white hover:bg-amber-900/55 disabled:opacity-70 disabled:pointer-events-none transition-colors whitespace-nowrap"
+                >
+                  {sendNowBusy === style ? 'Sending…' : 'Send now'}
+                </button>
+                {sendNowHint[style] ? (
+                  <p
+                    className={`text-[10px] leading-snug ${
+                      sendNowHint[style] === 'Sent.' ? 'text-emerald-300' : 'text-gray-200'
+                    }`}
+                  >
+                    {sendNowHint[style]}
+                  </p>
+                ) : null}
               </div>
             </div>
           );

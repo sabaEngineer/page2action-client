@@ -104,3 +104,8 @@ export type UserNotificationsResponse = {
   deliveryTimeZone: string;
   schedules: NotificationScheduleRow[];
 };
+
+export type SendNotificationNowResponse = {
+  sent: boolean;
+  message: string;
+};

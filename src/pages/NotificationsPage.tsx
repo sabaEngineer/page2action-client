@@ -16,9 +16,10 @@ export default function NotificationsPage() {
         >
           Notifications
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-gray-400 max-w-xl">
+        <p className="mt-3 text-sm leading-relaxed text-gray-300 max-w-xl">
           Pick a send time for each insight style. Time zone follows this device automatically. We send at most one
-          email per style per day when you have a matching insight that has not been emailed yet.
+          email per style per day with the next insight in rotation for that style (never-emailed first, then it cycles).
+          Use <span className="text-gray-200">Send now</span> to send that next insight immediately.
         </p>
       </header>
 
