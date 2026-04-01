@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const nav = [
   { to: '/books', label: 'Bookshelf', icon: BookIcon },
   { to: '/insights', label: 'Insights', icon: LightbulbIcon },
+  { to: '/notifications', label: 'Notifications', icon: BellIcon },
 ];
 
 export default function Sidebar() {
@@ -42,7 +43,7 @@ export function MobileNav() {
           key={item.to}
           to={item.to}
           className={({ isActive }) =>
-            `flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+            `flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium leading-tight transition-colors sm:text-xs ${
               isActive
                 ? 'text-indigo-400'
                 : 'text-gray-500 hover:text-gray-300'
@@ -50,7 +51,7 @@ export function MobileNav() {
           }
         >
           <item.icon />
-          {item.label}
+          <span className="truncate max-w-[4.5rem] text-center">{item.label}</span>
         </NavLink>
       ))}
     </nav>
@@ -69,6 +70,18 @@ function LightbulbIcon() {
   return (
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
+      />
     </svg>
   );
 }

@@ -92,3 +92,15 @@ export type PublicSharedInsight = {
   /** Footer denominator: insight count + 1 (“new page” slot), same as authenticated book view. */
   totalPages: number;
 };
+
+export type NotificationScheduleRow = {
+  style: InsightStyle;
+  enabled: boolean;
+  localHour: number;
+  localMinute: number;
+};
+
+export type UserNotificationsResponse = {
+  deliveryTimeZone: string;
+  schedules: NotificationScheduleRow[];
+};

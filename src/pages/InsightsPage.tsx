@@ -103,7 +103,7 @@ export default function InsightsPage() {
 
   if (books.length === 0) {
     return (
-      <section className="text-left">
+      <section className="text-left min-h-0 flex flex-col gap-3">
         <p className="text-gray-500">Add some books first, then save insights from them.</p>
       </section>
     );

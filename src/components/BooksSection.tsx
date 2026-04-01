@@ -5,6 +5,7 @@ import { apiFetch } from '../lib/api';
 import type { Book, Shelf, ShareStatus } from '../lib/types';
 import { publicBookshelfShareUrl } from '../lib/shareUrl';
 import ShareLinkCopyButton from './ShareLinkCopyButton';
+import { BookshelfListSkeleton } from './BookshelfSkeleton';
 import { BookSpine } from './ShelfView';
 
 export default function BooksSection() {
@@ -89,7 +90,7 @@ export default function BooksSection() {
       : null;
 
   return (
-    <section className="text-left">
+    <section className="text-left" aria-busy={loading}>
       {/* Header */}
       <div
         className={`flex flex-wrap items-start gap-3 ${bookshelfShareUrl ? 'justify-between' : 'justify-end'}`}
@@ -147,7 +148,10 @@ export default function BooksSection() {
       )}
 
       {loading ? (
-        <p className="mt-8 text-sm text-gray-500">Loading…</p>
+        <>
+          <span className="sr-only">Loading bookshelf</span>
+          <BookshelfListSkeleton />
+        </>
       ) : shelves.length === 0 ? (
         <div className="mt-12 flex flex-col items-center text-center max-w-sm mx-auto">
           <p className="text-gray-500 text-sm">

@@ -4,6 +4,7 @@ import { useAuth } from '../context/auth';
 import { apiFetch } from '../lib/api';
 import type { Shelf } from '../lib/types';
 import ShelfView from '../components/ShelfView';
+import { ShelfViewSkeleton } from '../components/BookshelfSkeleton';
 
 export default function ShelfDetailPage() {
   const { shelfId } = useParams<{ shelfId: string }>();
@@ -29,7 +30,17 @@ export default function ShelfDetailPage() {
     void load();
   }, [load]);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (loading) {
+    return (
+      <div aria-busy="true">
+        <Link to="/books" className="text-sm text-gray-500 hover:text-indigo-400 transition-colors">
+          &larr; All shelves
+        </Link>
+        <span className="sr-only">Loading shelf</span>
+        <ShelfViewSkeleton />
+      </div>
+    );
+  }
   if (!shelf) return null;
 
   return (

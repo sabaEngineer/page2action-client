@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth';
+import { useDeliveryTimeZoneSync } from '../hooks/useDeliveryTimeZoneSync';
 import { ImmersiveFullscreenProvider, useImmersiveFullscreenOptional } from '../context/immersive-fullscreen-context';
 import Sidebar, { MobileNav } from './Sidebar';
 
 function AppLayoutShell() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
+  useDeliveryTimeZoneSync(token);
   const { pathname } = useLocation();
   const immersive = useImmersiveFullscreenOptional()?.immersive ?? false;
   /** Insights (non-immersive): fill viewport and scroll inside the book, not the whole app shell. */

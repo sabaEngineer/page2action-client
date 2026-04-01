@@ -1,10 +1,11 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import AuthCallback from './pages/AuthCallback';
 import AppLayout from './components/AppLayout';
 import BooksPage from './pages/BooksPage';
 import ShelfDetailPage from './pages/ShelfDetailPage';
 import InsightsPage from './pages/InsightsPage';
+import NotificationsPage from './pages/NotificationsPage';
 import PublicShelfPage from './pages/PublicShelfPage';
 import PublicBookshelfPage from './pages/PublicBookshelfPage';
 import PublicInsightPage from './pages/PublicInsightPage';
@@ -29,6 +30,8 @@ export default function App() {
         <Route path="/books" element={<BooksPage />} />
         <Route path="/books/:shelfId" element={<ShelfDetailPage />} />
         <Route path="/insights" element={<InsightsPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/boosts" element={<Navigate to="/notifications" replace />} />
       </Route>
     </Routes>
   );
