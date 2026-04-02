@@ -77,7 +77,6 @@ export async function renderInsightOg(params: {
 
   const bookLabel = data.bookTitle.trim() || `p.${data.page}`;
   const headline = `Insight from ${bookLabel}`;
-  const ogTitle = `${headline} · Page2Action`;
   const e = (s: string) => escapeHtmlAttr(s);
 
   const html = `<!DOCTYPE html>
@@ -85,14 +84,14 @@ export async function renderInsightOg(params: {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${e(ogTitle)}</title>
-  <meta property="og:title" content="${e(ogTitle)}" />
+  <title>${e(headline)}</title>
+  <meta property="og:title" content="${e(headline)}" />
   <meta property="og:description" content="${e(insightText)}" />
   <meta property="og:url" content="${e(canonical)}" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="Page2Action" />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="${e(ogTitle)}" />
+  <meta name="twitter:title" content="${e(headline)}" />
   <meta name="twitter:description" content="${e(insightText)}" />
   <link rel="canonical" href="${e(canonical)}" />
 </head>
