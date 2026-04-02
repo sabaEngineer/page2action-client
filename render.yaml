@@ -1,0 +1,16 @@
+# Optional Render Blueprint (Web Service — not a static site).
+# Deploy the client from this directory with Start Command matching package.json "start".
+services:
+  - type: web
+    name: page2action-client
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_URL
+        sync: false
+      - key: API_URL
+        sync: false
