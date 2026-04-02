@@ -1117,14 +1117,6 @@ function PageMenu({
                   </button>
                 );
               })}
-              {styleInfo && (
-                <>
-                  <div className="my-1 h-px bg-[#d9ceb8]/60" />
-                  <div className="px-3.5 py-2 text-[10px] text-[#8a7e6b]">
-                    AI suggested: {styleInfo.emoji} {styleInfo.label}
-                  </div>
-                </>
-              )}
             </>
           )}
         </div>
