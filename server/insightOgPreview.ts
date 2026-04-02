@@ -68,20 +68,16 @@ export async function renderInsightOg(params: {
     };
   }
 
-  let desc = plainTextExcerpt(data.content, 200);
-  if (!desc && data.details?.length) {
-    desc = plainTextExcerpt(data.details.map((d) => d.content).join(' '), 200);
+  /** Insight text for preview body only (not in title). */
+  let insightText = plainTextExcerpt(data.content, 320);
+  if (!insightText && data.details?.length) {
+    insightText = plainTextExcerpt(data.details.map((d) => d.content).join(' '), 320);
   }
-  if (!desc) desc = 'Shared insight on Page2Action.';
+  if (!insightText) insightText = 'Open to read this insight on Page2Action.';
 
-  const titleFromInsight =
-    plainTextExcerpt(data.content, 88) ||
-    (data.details?.length
-      ? plainTextExcerpt(data.details.map((d) => d.content).join(' '), 88)
-      : '');
-  const ogTitle = titleFromInsight
-    ? `${titleFromInsight} · Page2Action`
-    : `${data.bookTitle} · p.${data.page} · Page2Action`;
+  const bookLabel = data.bookTitle.trim() || `p.${data.page}`;
+  const headline = `Insight from ${bookLabel}`;
+  const ogTitle = `${headline} · Page2Action`;
   const e = (s: string) => escapeHtmlAttr(s);
 
   const html = `<!DOCTYPE html>
@@ -91,17 +87,18 @@ export async function renderInsightOg(params: {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${e(ogTitle)}</title>
   <meta property="og:title" content="${e(ogTitle)}" />
-  <meta property="og:description" content="${e(desc)}" />
+  <meta property="og:description" content="${e(insightText)}" />
   <meta property="og:url" content="${e(canonical)}" />
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="Page2Action" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="${e(ogTitle)}" />
-  <meta name="twitter:description" content="${e(desc)}" />
+  <meta name="twitter:description" content="${e(insightText)}" />
   <link rel="canonical" href="${e(canonical)}" />
 </head>
 <body style="font-family:system-ui,sans-serif;padding:1.25rem;max-width:36rem;line-height:1.5;">
-  <p style="margin:0 0 0.75rem;color:#333">${e(desc)}</p>
+  <p style="margin:0 0 0.5rem;font-weight:600;color:#111">${e(headline)}</p>
+  <p style="margin:0 0 0.75rem;color:#333">${e(insightText)}</p>
   <p style="margin:0"><a href="${e(canonical)}">Open in Page2Action</a></p>
 </body>
 </html>`;
