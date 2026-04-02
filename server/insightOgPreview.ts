@@ -74,7 +74,14 @@ export async function renderInsightOg(params: {
   }
   if (!desc) desc = 'Shared insight on Page2Action.';
 
-  const ogTitle = `${data.bookTitle} · p.${data.page} · Page2Action`;
+  const titleFromInsight =
+    plainTextExcerpt(data.content, 88) ||
+    (data.details?.length
+      ? plainTextExcerpt(data.details.map((d) => d.content).join(' '), 88)
+      : '');
+  const ogTitle = titleFromInsight
+    ? `${titleFromInsight} · Page2Action`
+    : `${data.bookTitle} · p.${data.page} · Page2Action`;
   const e = (s: string) => escapeHtmlAttr(s);
 
   const html = `<!DOCTYPE html>
